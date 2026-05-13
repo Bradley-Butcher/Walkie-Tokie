@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { ReviewRelay } from "./relay.js";
 import { RelayError } from "./types.js";
 
-const target = "brad/withcoral/coral#1234";
+const target = "team/example/repo#1234";
 
 function relay() {
   let next = 1;
@@ -12,9 +12,9 @@ function relay() {
   });
   reviewRelay.startReviewMode({
     target,
-    repo: "withcoral/coral",
+    repo: "example/repo",
     pr: 1234,
-    session: "big-brain-bert",
+    session: "review-pr-123",
     capabilities: ["explain", "inspect"],
     maxPending: 2,
   });
@@ -32,7 +32,7 @@ describe("ReviewRelay", () => {
 
     const ask = reviewRelay.askReviewPeer({
       target,
-      question: "Why is validation below the gRPC boundary?",
+      question: "Why is validation below the transport boundary?",
       mode: "inspect",
       timeoutSeconds: 30,
     });
@@ -57,12 +57,12 @@ describe("ReviewRelay", () => {
     const reviewRelay = relay();
 
     const wait = reviewRelay.waitForReviewSession({
-      session: "big-brain-bert",
+      session: "review-pr-123",
       timeoutSeconds: 30,
     });
 
     const ask = reviewRelay.askReviewSession({
-      session: "big-brain-bert",
+      session: "review-pr-123",
       question: "Can I address this by session name?",
       mode: "inspect",
       timeoutSeconds: 30,
@@ -207,9 +207,9 @@ describe("ReviewRelay", () => {
 
     reviewRelay.startReviewMode({
       target,
-      repo: "withcoral/coral",
+      repo: "example/repo",
       pr: 1234,
-      session: "big-brain-bert-v2",
+      session: "review-pr-123-v2",
       capabilities: ["inspect"],
     });
 
