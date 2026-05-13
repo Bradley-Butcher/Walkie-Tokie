@@ -8,7 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { createRelayHttpServer, serverUrl } from "../server/http.js";
 
-const target = "brad/withcoral/coral#1234";
+const target = "team/example/repo#1234";
 
 describe("walkie-tokie-mcp", () => {
   it("exposes the blocking review exchange over stdio MCP", async () => {
@@ -40,9 +40,9 @@ describe("walkie-tokie-mcp", () => {
 
       await callJson(client, "start_review_mode", {
         target,
-        repo: "withcoral/coral",
+        repo: "example/repo",
         pr: 1234,
-        session: "big-brain-bert",
+        session: "review-pr-123",
         capabilities: ["inspect"],
       });
 
@@ -52,14 +52,14 @@ describe("walkie-tokie-mcp", () => {
       });
       const ask = callJson(client, "ask_review_peer", {
         target,
-        question: "Why is validation below the gRPC boundary?",
+        question: "Why is validation below the transport boundary?",
         mode: "inspect",
         timeoutSeconds: 5,
       });
 
       const delivered = await wait;
       assert.equal(delivered.status, "request");
-      assert.equal(delivered.request.question, "Why is validation below the gRPC boundary?");
+      assert.equal(delivered.request.question, "Why is validation below the transport boundary?");
 
       await callJson(client, "reply_to_review_request", {
         requestId: delivered.request.requestId,
@@ -74,12 +74,12 @@ describe("walkie-tokie-mcp", () => {
 
       const address = app.server.address() as AddressInfo;
       const sessionWait = callJson(client, "wait_for_message", {
-        session_name: "big-brain-bert",
+        session_name: "review-pr-123",
         timeoutSeconds: 5,
       });
       const sessionAsk = callJson(client, "send_message", {
         host: `127.0.0.1:${address.port}`,
-        session_name: "big-brain-bert",
+        session_name: "review-pr-123",
         message: "Can I send by host and session name?",
         mode: "inspect",
         timeoutSeconds: 5,
@@ -101,11 +101,11 @@ describe("walkie-tokie-mcp", () => {
       });
 
       const triggerWait = callJson(client, "wait_for_message", {
-        session_name: "big-brain-bert",
+        session_name: "review-pr-123",
         timeoutSeconds: 5,
       });
       const triggerAsk = callJson(client, "send_message", {
-        trigger: `walkie-tokie/127.0.0.1:${address.port}/big-brain-bert Does the trigger work?`,
+        trigger: `walkie-tokie/127.0.0.1:${address.port}/review-pr-123 Does the trigger work?`,
         timeoutSeconds: 5,
       });
 
@@ -125,15 +125,15 @@ describe("walkie-tokie-mcp", () => {
       });
 
       const autoWait = callJson(client, "wait_for_message", {
-        session_name: "auto-start-bert",
-        repo: "withcoral/coral",
+        session_name: "auto-start-review",
+        repo: "example/repo",
         pr: 5678,
         capabilities: ["inspect"],
         timeoutSeconds: 5,
       });
       await sleep(50);
       const autoAsk = callJson(client, "send_message", {
-        to: `127.0.0.1:${address.port}/auto-start-bert`,
+        to: `127.0.0.1:${address.port}/auto-start-review`,
         message: "Did wait_for_message create review mode?",
         mode: "inspect",
         timeoutSeconds: 5,

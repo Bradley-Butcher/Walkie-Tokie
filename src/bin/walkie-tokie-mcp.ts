@@ -37,7 +37,7 @@ Preferred author flow:
 4. Call wait_for_message again to keep accepting review questions.
 
 Preferred reviewer flow:
-1. Ask the author for their recipient identifier, shaped like host/session-name, for example brad-laptop/big-lad-john.
+1. Ask the author for their recipient identifier, shaped like host/session-name, for example alice-laptop/review-pr-123.
 2. If the user pastes a string shaped like "walkie-tokie/<host>/<session> <question>", call send_message with trigger=<that whole string>.
 3. Otherwise call send_message with to=<recipient identifier> and message=<question>.
 4. The call blocks until the author answers, rejects, closes review mode, or the timeout expires.
@@ -82,7 +82,7 @@ server.registerTool(
     title: "Start Review Mode",
     description: "Create or replace a review endpoint for an author's parked Codex session.",
     inputSchema: {
-      target: targetSchema.describe("Endpoint id, such as brad/withcoral/coral#1234"),
+      target: targetSchema.describe("Endpoint id, such as team/example/repo#1234"),
       repo: repoSchema.describe("Repository in owner/name form"),
       pr: z.number().int().positive().describe("Pull request number"),
       session: sessionSchema.describe("Human-friendly Codex session name or id"),
@@ -102,7 +102,7 @@ server.registerTool(
     title: "Close Review Mode",
     description: "Close a review endpoint and cancel queued requests.",
     inputSchema: {
-      target: targetSchema.describe("Endpoint id, such as brad/withcoral/coral#1234"),
+      target: targetSchema.describe("Endpoint id, such as team/example/repo#1234"),
     },
   },
   async ({ target }) => {
@@ -135,7 +135,7 @@ server.registerTool(
     description:
       "Author-side blocking wait for the next message addressed to a named review session. Starts the local relay and review mode if needed.",
     inputSchema: {
-      session_name: sessionSchema.describe("Author's review session name, such as big-lad-john"),
+      session_name: sessionSchema.describe("Author's review session name, such as review-pr-123"),
       repo: repoSchema.optional().describe("Repository in owner/name form. Required when creating review mode."),
       pr: z.number().int().positive().optional().describe("Pull request number. Required when creating review mode."),
       capabilities: z.array(capabilitySchema).min(1).default(["inspect"]),
@@ -185,16 +185,16 @@ server.registerTool(
         .min(1)
         .max(20_700)
         .optional()
-        .describe("Full copy-paste trigger, such as walkie-tokie/brad-laptop/big-lad-john Why is this safe?"),
+        .describe("Full copy-paste trigger, such as walkie-tokie/alice-laptop/review-pr-123 Why is this safe?"),
       to: recipientSchema
         .optional()
-        .describe("Recipient identifier, such as brad-laptop/big-lad-john"),
+        .describe("Recipient identifier, such as alice-laptop/review-pr-123"),
       host: hostSchema
         .optional()
-        .describe("Tailscale hostname or host:port, such as brad-laptop"),
+        .describe("Tailscale hostname or host:port, such as alice-laptop"),
       session_name: sessionSchema
         .optional()
-        .describe("Remote review session name, such as big-lad-john"),
+        .describe("Remote review session name, such as review-pr-123"),
       message: questionSchema.optional().describe("Message or question for the remote agent"),
       mode: capabilitySchema.default("inspect"),
       timeoutSeconds: timeoutSecondsSchema(900, 3_600),
@@ -223,7 +223,7 @@ server.registerTool(
     description:
       "Reviewer-side blocking ask. Submits a question and waits for the author's agent to answer.",
     inputSchema: {
-      target: targetSchema.describe("Endpoint id, such as brad/withcoral/coral#1234"),
+      target: targetSchema.describe("Endpoint id, such as team/example/repo#1234"),
       question: questionSchema,
       mode: capabilitySchema.default("inspect"),
       timeoutSeconds: timeoutSecondsSchema(900, 3_600),

@@ -25,7 +25,7 @@ package is public and ships compiled JavaScript only.
 Authors can share a copy-paste trigger in a PR:
 
 ```text
-walkie-tokie/brad-laptop/big-lad-john <question>
+walkie-tokie/alice-laptop/review-pr-123 <question>
 ```
 
 When an MCP-enabled agent sees that shape, it should call `send_message` with
