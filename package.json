@@ -11,16 +11,12 @@
   "bugs": {
     "url": "https://github.com/Bradley-Butcher/Walkie-Tokie/issues"
   },
-  "homepage": "https://github.com/Bradley-Butcher/Walkie-Tokie#readme",
+  "homepage": "https://github.com/Bradley-Butcher/Walkie-Tokie",
   "engines": {
     "node": ">=22"
   },
   "files": [
-    "dist",
-    "README.md",
-    "docs",
-    "examples",
-    "spec"
+    "dist"
   ],
   "scripts": {
     "build": "npm run clean && tsc -p tsconfig.json",
