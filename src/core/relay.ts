@@ -170,9 +170,7 @@ export class ReviewRelay {
     if (endpoint.state === "closed" || endpoint.state === "authoring") {
       throw new RelayError("not_in_review_mode", "Review mode is not active", 409);
     }
-    if (this.waiters.has(endpoint.target)) {
-      throw new RelayError("busy", "A wait call is already active for this endpoint", 409);
-    }
+    this.supersedeWaiter(endpoint.target);
     if (this.activeAnswers.has(endpoint.target)) {
       throw new RelayError("busy", "The author agent is already answering a request", 409);
     }
@@ -324,6 +322,20 @@ export class ReviewRelay {
       return request;
     }
     return undefined;
+  }
+
+  private supersedeWaiter(target: string): void {
+    const waiter = this.waiters.get(target);
+    if (!waiter) {
+      return;
+    }
+
+    clearTimeout(waiter.timeout);
+    this.waiters.delete(target);
+    waiter.resolve({
+      status: "superseded",
+      message: "A newer wait call replaced this one.",
+    });
   }
 
   private deliverToAuthor(endpoint: ReviewEndpoint, request: PendingRequest): DeliveredReviewRequest {

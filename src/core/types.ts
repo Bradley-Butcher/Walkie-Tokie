@@ -77,8 +77,9 @@ export interface WaitForReviewRequestInput {
 }
 
 export interface WaitForReviewRequestResult {
-  status: "request" | "timeout";
+  status: "request" | "timeout" | "superseded";
   request?: DeliveredReviewRequest;
+  message?: string;
 }
 
 export interface DeliveredReviewRequest {

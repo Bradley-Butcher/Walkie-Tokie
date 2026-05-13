@@ -7,6 +7,25 @@ type CommandRunner = (
   options: Parameters<typeof spawnSync>[2],
 ) => Pick<ReturnType<typeof spawnSync>, "status" | "stdout">;
 
+const tailscaleCliCandidates = [
+  "tailscale",
+  "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+];
+
+export function detectTailscaleHost(options: {
+  runCommand?: CommandRunner;
+  interfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>;
+} = {}): string | undefined {
+  const runCommand = options.runCommand ?? spawnSync;
+  return (
+    detectTailscaleHostnameFromCli(runCommand) ??
+    detectTailscaleIpv4({
+      runCommand,
+      interfaces: options.interfaces,
+    })
+  );
+}
+
 export function detectTailscaleIpv4(options: {
   runCommand?: CommandRunner;
   interfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>;
@@ -15,6 +34,26 @@ export function detectTailscaleIpv4(options: {
     detectTailscaleIpv4FromCli(options.runCommand ?? spawnSync) ??
     detectTailscaleIpv4FromInterfaces(options.interfaces ?? networkInterfaces())
   );
+}
+
+export function detectTailscaleHostnameFromCli(
+  runCommand: CommandRunner,
+  commands = tailscaleCliCandidates,
+): string | undefined {
+  for (const command of commands) {
+    const result = runCommand(command, ["status", "--json"], {
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+    if (result.status !== 0 || typeof result.stdout !== "string") {
+      continue;
+    }
+    const hostname = parseTailscaleHostname(result.stdout);
+    if (hostname) {
+      return hostname;
+    }
+  }
+  return undefined;
 }
 
 export function detectTailscaleIpv4FromCli(runCommand: CommandRunner): string | undefined {
@@ -67,6 +106,41 @@ export function isLocalPeerAddress(host: string): boolean {
 
 export function isAllowedUnauthenticatedPeerAddress(host: string): boolean {
   return isLocalPeerAddress(host) || isTailscaleIpv4(host);
+}
+
+function parseTailscaleHostname(statusJson: string): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(statusJson);
+  } catch {
+    return undefined;
+  }
+
+  const self = typeof parsed === "object" && parsed !== null
+    ? (parsed as { Self?: unknown }).Self
+    : undefined;
+  if (typeof self !== "object" || self === null) {
+    return undefined;
+  }
+
+  const dnsName = (self as { DNSName?: unknown }).DNSName;
+  if (typeof dnsName === "string") {
+    const firstLabel = dnsName.replace(/\.$/, "").split(".")[0];
+    if (isShareableHost(firstLabel)) {
+      return firstLabel;
+    }
+  }
+
+  const hostName = (self as { HostName?: unknown }).HostName;
+  if (typeof hostName === "string" && isShareableHost(hostName)) {
+    return hostName;
+  }
+
+  return undefined;
+}
+
+function isShareableHost(host: string | undefined): host is string {
+  return typeof host === "string" && /^[a-zA-Z0-9_.-]+$/.test(host) && host.length > 0;
 }
 
 function normalizeIpAddress(host: string): string | undefined {

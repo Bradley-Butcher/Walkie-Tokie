@@ -166,6 +166,42 @@ describe("ReviewRelay", () => {
     assert.equal((await secondAsk).answer, "Second answer");
   });
 
+  it("lets a newer wait call supersede an older idle wait", async () => {
+    const reviewRelay = relay();
+
+    const staleWait = reviewRelay.waitForReviewRequest({
+      endpoint: target,
+      timeoutSeconds: 30,
+    });
+    const freshWait = reviewRelay.waitForReviewRequest({
+      endpoint: target,
+      timeoutSeconds: 30,
+    });
+
+    assert.deepEqual(await staleWait, {
+      status: "superseded",
+      message: "A newer wait call replaced this one.",
+    });
+
+    const ask = reviewRelay.askReviewPeer({
+      target,
+      question: "Does the newest wait win?",
+      mode: "inspect",
+      timeoutSeconds: 30,
+    });
+
+    const delivered = await freshWait;
+    assert.equal(delivered.status, "request");
+    assert.equal(delivered.request?.question, "Does the newest wait win?");
+
+    reviewRelay.replyToReviewRequest({
+      requestId: delivered.request?.requestId ?? "",
+      answer: "Yes.",
+    });
+
+    assert.equal((await ask).answer, "Yes.");
+  });
+
   it("rejects when the queue is full", async () => {
     const reviewRelay = relay();
 
