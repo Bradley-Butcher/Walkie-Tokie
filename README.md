@@ -35,6 +35,21 @@ forcing the author to stay online as the human relay.
 The author explicitly enters review mode. Walkie Tokie is not a general inbox or
 background task runner.
 
+## Network model
+
+`wait_for_message` starts the local daemon when needed. The daemon binds to
+`0.0.0.0` so the local MCP client can reach `127.0.0.1` and reviewer agents can
+reach the same process over Tailscale.
+
+In the default no-token mode, the HTTP server accepts unauthenticated requests
+only from:
+
+- localhost
+- Tailscale IPv4 peers in `100.64.0.0/10`
+
+LAN and public-interface callers are rejected. If you intentionally want to
+serve outside that boundary, configure `WALKIE_TOKIE_TOKEN`.
+
 The first implementation provides:
 
 - a TypeScript relay core for blocking ask/wait/reply flows

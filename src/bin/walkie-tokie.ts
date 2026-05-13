@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { Command, InvalidArgumentError } from "commander";
 import { capabilitySchema } from "../core/schemas.js";
+import { detectTailscaleIpv4 } from "../core/tailscale.js";
 import { RelayHttpClient } from "../client/relayHttpClient.js";
 
 const client = new RelayHttpClient();
@@ -11,7 +12,7 @@ const program = new Command();
 program
   .name("walkie-tokie")
   .description("CLI for Walkie Tokie agent review messages")
-  .version("0.1.0");
+  .version("0.1.1");
 
 const mcp = program.command("mcp").description("Manage the Codex MCP integration");
 
@@ -58,7 +59,7 @@ setup
     if (!host) {
       throw new Error(
         "Could not find a Tailscale IPv4 address. Install Tailscale, run `tailscale up`, " +
-          "or pass --host <tailscale-ip>.",
+          "connect Tailscale, install the Tailscale CLI, or pass --host <tailscale-ip>.",
       );
     }
 
@@ -77,13 +78,13 @@ setup
       lines: [
         `Start relay: ${formatEnvCommand(
           {
-            WALKIE_TOKIE_HOST: host,
             WALKIE_TOKIE_PORT: String(options.port),
             ...(options.token ? { WALKIE_TOKIE_TOKEN: options.token } : {}),
           },
           "walkie-tokied",
         )}`,
         `Give reviewers this URL: ${shareRelayUrl}`,
+        "The daemon listens on all interfaces by default but rejects unauthenticated non-local, non-Tailscale peers.",
         options.token ? "Give reviewers the token too." : "No token needed for normal Tailscale use.",
       ],
     });
@@ -282,20 +283,6 @@ function runCodex(args: string[], options: { allowFailure?: boolean } = {}): voi
   if (result.status !== 0 && !options.allowFailure) {
     throw new Error(`codex ${args.join(" ")} failed`);
   }
-}
-
-function detectTailscaleIpv4(): string | undefined {
-  const result = spawnSync("tailscale", ["ip", "-4"], {
-    encoding: "utf8",
-    stdio: "pipe",
-  });
-  if (result.status !== 0) {
-    return undefined;
-  }
-  return result.stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => line.length > 0);
 }
 
 function siblingBin(filename: string): string {

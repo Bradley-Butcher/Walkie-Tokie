@@ -7,32 +7,21 @@ import {
   listenRelayHttpServer,
 } from "../server/http.js";
 
-const host = process.env.WALKIE_TOKIE_HOST ?? "127.0.0.1";
+const host = process.env.WALKIE_TOKIE_HOST ?? "0.0.0.0";
 const port = Number.parseInt(process.env.WALKIE_TOKIE_PORT ?? "8787", 10);
 const logger = process.env.WALKIE_TOKIE_LOG !== "0";
 const token = process.env.WALKIE_TOKIE_TOKEN;
 
 if (
   !token &&
-  isWildcardBindHost(host) &&
-  process.env.WALKIE_TOKIE_ALLOW_UNAUTHENTICATED !== "1"
-) {
-  process.stderr.write(
-    "Refusing to listen on a wildcard address without WALKIE_TOKIE_TOKEN. " +
-      "Bind to your Tailscale IP instead: WALKIE_TOKIE_HOST=\"$(tailscale ip -4)\".\n",
-  );
-  process.exit(1);
-}
-
-if (
-  !token &&
   !isLocalBindHost(host) &&
   !isTailscaleIpv4(host) &&
+  !isWildcardBindHost(host) &&
   process.env.WALKIE_TOKIE_ALLOW_UNAUTHENTICATED !== "1"
 ) {
   process.stderr.write(
     "Refusing to listen on a non-local, non-Tailscale address without WALKIE_TOKIE_TOKEN. " +
-      "Use WALKIE_TOKIE_HOST=\"$(tailscale ip -4)\", set WALKIE_TOKIE_TOKEN, or set " +
+      "Use the default wildcard bind, set WALKIE_TOKIE_TOKEN, or set " +
       "WALKIE_TOKIE_ALLOW_UNAUTHENTICATED=1.\n",
   );
   process.exit(1);

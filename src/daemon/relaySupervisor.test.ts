@@ -20,7 +20,7 @@ describe("relay supervisor", () => {
     });
   });
 
-  it("starts the daemon on the detected Tailscale IP when health is missing", async () => {
+  it("starts the daemon on a wildcard bind and reports the detected Tailscale URL", async () => {
     let calls = 0;
     const spawned: Array<{ command: string; args: string[]; env?: NodeJS.ProcessEnv }> = [];
 
@@ -39,11 +39,36 @@ describe("relay supervisor", () => {
     });
 
     assert.equal(spawned.length, 1);
-    assert.equal(spawned[0]?.env?.WALKIE_TOKIE_HOST, "100.64.0.10");
+    assert.equal(spawned[0]?.env?.WALKIE_TOKIE_HOST, "0.0.0.0");
     assert.equal(spawned[0]?.env?.WALKIE_TOKIE_PORT, "8787");
     assert.equal(status.running, true);
     assert.equal(status.publicUrl, "http://100.64.0.10:8787");
     assert.equal(status.pid, 456);
+    assert.equal(status.started, true);
+  });
+
+  it("starts even when no Tailscale address can be detected locally", async () => {
+    let calls = 0;
+    const spawned: Array<{ env?: NodeJS.ProcessEnv }> = [];
+
+    const status = await ensureDaemonRunning({
+      detectTailscaleIp: () => undefined,
+      pollIntervalMs: 1,
+      healthTimeoutMs: 100,
+      fetch: async () => {
+        calls += 1;
+        return new Response("ok", { status: calls >= 2 ? 200 : 503 });
+      },
+      spawnProcess: (_command, _args, options) => {
+        spawned.push({ env: options?.env });
+        return { pid: 789, unref: () => undefined };
+      },
+    });
+
+    assert.equal(spawned[0]?.env?.WALKIE_TOKIE_HOST, "0.0.0.0");
+    assert.equal(status.running, true);
+    assert.equal(status.publicHost, undefined);
+    assert.equal(status.publicUrl, undefined);
     assert.equal(status.started, true);
   });
 
