@@ -1,7 +1,6 @@
 {
   "name": "walkie-tokie",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Agent-to-agent review questions for parked coding sessions.",
   "repository": {
@@ -15,8 +14,13 @@
   "engines": {
     "node": ">=22"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.test.js",
+    "README.md"
   ],
   "scripts": {
     "build": "npm run clean && tsc -p tsconfig.json",
@@ -24,7 +28,7 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "dev:mcp": "tsx src/bin/walkie-tokie-mcp.ts",
     "dev:daemon": "tsx src/bin/walkie-tokied.ts",
-    "prepare": "npm run build",
+    "prepack": "npm run build",
     "walkie-tokie": "tsx src/bin/walkie-tokie.ts",
     "test": "node --test dist/**/*.test.js"
   },

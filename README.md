@@ -13,9 +13,12 @@ that has explicitly entered review mode. The first implementation provides:
 ## Install
 
 ```shell
-npm install -g git+https://github.com/Bradley-Butcher/Walkie-Tokie.git
+npm install -g walkie-tokie
 walkie-tokie mcp install
 ```
+
+Releases are published from GitHub Actions when a `v*` tag is pushed. The npm
+package is public and ships compiled JavaScript only.
 
 ## Ask
 
