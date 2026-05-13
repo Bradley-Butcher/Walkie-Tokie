@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ensureRelaydRunning, relayStatus } from "./relaySupervisor.js";
+import { ensureDaemonRunning, relayStatus } from "./relaySupervisor.js";
 
 describe("relay supervisor", () => {
-  it("returns existing health without spawning relayd", async () => {
+  it("returns existing health without spawning the daemon", async () => {
     let spawnCount = 0;
-    const status = await ensureRelaydRunning({
+    const status = await ensureDaemonRunning({
       fetch: async () => new Response("ok", { status: 200 }),
       spawnProcess: () => {
         spawnCount += 1;
@@ -20,11 +20,11 @@ describe("relay supervisor", () => {
     });
   });
 
-  it("starts relayd on the detected Tailscale IP when health is missing", async () => {
+  it("starts the daemon on the detected Tailscale IP when health is missing", async () => {
     let calls = 0;
     const spawned: Array<{ command: string; args: string[]; env?: NodeJS.ProcessEnv }> = [];
 
-    const status = await ensureRelaydRunning({
+    const status = await ensureDaemonRunning({
       detectTailscaleIp: () => "100.80.1.2",
       pollIntervalMs: 1,
       healthTimeoutMs: 100,
@@ -41,15 +41,13 @@ describe("relay supervisor", () => {
     assert.equal(spawned.length, 1);
     assert.equal(spawned[0]?.env?.WALKIE_TOKIE_HOST, "100.80.1.2");
     assert.equal(spawned[0]?.env?.WALKIE_TOKIE_PORT, "8787");
-    assert.equal(spawned[0]?.env?.REVIEW_RELAY_HOST, "100.80.1.2");
-    assert.equal(spawned[0]?.env?.REVIEW_RELAY_PORT, "8787");
     assert.equal(status.running, true);
     assert.equal(status.publicUrl, "http://100.80.1.2:8787");
     assert.equal(status.pid, 456);
     assert.equal(status.started, true);
   });
 
-  it("reports status without starting relayd", async () => {
+  it("reports status without starting the daemon", async () => {
     const status = await relayStatus({
       detectTailscaleIp: () => "100.80.1.2",
       fetch: async () => {

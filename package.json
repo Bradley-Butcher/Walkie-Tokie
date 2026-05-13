@@ -23,19 +23,15 @@
     "check": "npm run build && npm test",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "dev:mcp": "tsx src/bin/walkie-tokie-mcp.ts",
-    "dev:relayd": "tsx src/bin/walkie-tokied.ts",
+    "dev:daemon": "tsx src/bin/walkie-tokied.ts",
     "prepare": "npm run build",
-    "review-relay": "tsx src/bin/walkie-tokie.ts",
     "walkie-tokie": "tsx src/bin/walkie-tokie.ts",
     "test": "node --test dist/**/*.test.js"
   },
   "bin": {
     "walkie-tokie": "./dist/bin/walkie-tokie.js",
     "walkie-tokie-mcp": "./dist/bin/walkie-tokie-mcp.js",
-    "walkie-tokied": "./dist/bin/walkie-tokied.js",
-    "review-relayd": "./dist/bin/walkie-tokied.js",
-    "review-relay": "./dist/bin/walkie-tokie.js",
-    "review-relay-mcp": "./dist/bin/walkie-tokie-mcp.js"
+    "walkie-tokied": "./dist/bin/walkie-tokied.js"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

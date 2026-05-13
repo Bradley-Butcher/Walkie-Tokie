@@ -9,7 +9,7 @@ export interface RelaySupervisorOptions {
   fetch?: typeof fetch;
   spawnProcess?: SpawnProcess;
   detectTailscaleIp?: () => string | undefined;
-  relaydPath?: string;
+  daemonPath?: string;
 }
 
 export interface RelayStatus {
@@ -29,7 +29,7 @@ type SpawnProcess = (
 
 const defaultPort = 8787;
 
-export async function ensureRelaydRunning(
+export async function ensureDaemonRunning(
   options: RelaySupervisorOptions = {},
 ): Promise<RelayStatus> {
   const port = options.port ?? defaultPort;
@@ -48,10 +48,10 @@ export async function ensureRelaydRunning(
     );
   }
 
-  const child = startRelayd({
+  const child = startDaemon({
     host: publicHost,
     port,
-    relaydPath: options.relaydPath,
+    daemonPath: options.daemonPath,
     spawnProcess: options.spawnProcess,
   });
 
@@ -84,24 +84,21 @@ export async function relayStatus(options: RelaySupervisorOptions = {}): Promise
   };
 }
 
-function startRelayd(input: {
+function startDaemon(input: {
   host: string;
   port: number;
-  relaydPath?: string;
+  daemonPath?: string;
   spawnProcess?: SpawnProcess;
 }): ChildProcess {
   const child = (input.spawnProcess ?? spawn)(process.execPath, [
-    input.relaydPath ?? siblingBin("../bin/walkie-tokied.js"),
+    input.daemonPath ?? siblingBin("../bin/walkie-tokied.js"),
   ], {
     detached: true,
     env: {
       ...process.env,
       WALKIE_TOKIE_HOST: input.host,
       WALKIE_TOKIE_PORT: String(input.port),
-      WALKIE_TOKIE_LOG: process.env.WALKIE_TOKIE_LOG ?? process.env.REVIEW_RELAY_LOG ?? "0",
-      REVIEW_RELAY_HOST: input.host,
-      REVIEW_RELAY_PORT: String(input.port),
-      REVIEW_RELAY_LOG: process.env.WALKIE_TOKIE_LOG ?? process.env.REVIEW_RELAY_LOG ?? "0",
+      WALKIE_TOKIE_LOG: process.env.WALKIE_TOKIE_LOG ?? "0",
     },
     stdio: "ignore",
   });

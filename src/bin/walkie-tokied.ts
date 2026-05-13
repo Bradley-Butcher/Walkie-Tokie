@@ -7,15 +7,15 @@ import {
   listenRelayHttpServer,
 } from "../server/http.js";
 
-const host = process.env.WALKIE_TOKIE_HOST ?? process.env.REVIEW_RELAY_HOST ?? "127.0.0.1";
-const port = Number.parseInt(process.env.WALKIE_TOKIE_PORT ?? process.env.REVIEW_RELAY_PORT ?? "8787", 10);
-const logger = (process.env.WALKIE_TOKIE_LOG ?? process.env.REVIEW_RELAY_LOG) !== "0";
-const token = process.env.WALKIE_TOKIE_TOKEN ?? process.env.REVIEW_RELAY_TOKEN;
+const host = process.env.WALKIE_TOKIE_HOST ?? "127.0.0.1";
+const port = Number.parseInt(process.env.WALKIE_TOKIE_PORT ?? "8787", 10);
+const logger = process.env.WALKIE_TOKIE_LOG !== "0";
+const token = process.env.WALKIE_TOKIE_TOKEN;
 
 if (
   !token &&
   isWildcardBindHost(host) &&
-  (process.env.WALKIE_TOKIE_ALLOW_UNAUTHENTICATED ?? process.env.REVIEW_RELAY_ALLOW_UNAUTHENTICATED) !== "1"
+  process.env.WALKIE_TOKIE_ALLOW_UNAUTHENTICATED !== "1"
 ) {
   process.stderr.write(
     "Refusing to listen on a wildcard address without WALKIE_TOKIE_TOKEN. " +
@@ -28,7 +28,7 @@ if (
   !token &&
   !isLocalBindHost(host) &&
   !isTailscaleIpv4(host) &&
-  (process.env.WALKIE_TOKIE_ALLOW_UNAUTHENTICATED ?? process.env.REVIEW_RELAY_ALLOW_UNAUTHENTICATED) !== "1"
+  process.env.WALKIE_TOKIE_ALLOW_UNAUTHENTICATED !== "1"
 ) {
   process.stderr.write(
     "Refusing to listen on a non-local, non-Tailscale address without WALKIE_TOKIE_TOKEN. " +

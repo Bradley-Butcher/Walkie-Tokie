@@ -24,7 +24,7 @@ mcp
   .option("--token <token>", "Optional bearer token for non-Tailscale deployments")
   .option("--skip-codex", "Only print commands; do not run codex mcp add")
   .action((options) => {
-    const user = options.user ?? process.env.WALKIE_TOKIE_USER ?? process.env.REVIEW_RELAY_USER ?? process.env.USER;
+    const user = options.user ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
     if (!user) {
       throw new Error("Could not infer user. Pass --user <name>.");
     }
@@ -56,14 +56,14 @@ const setup = program
 setup
   .command("author")
   .description("Print author relay startup instructions and install MCP")
-  .option("--host <ip>", "Tailscale IPv4 address to bind relayd to")
+  .option("--host <ip>", "Tailscale IPv4 address to bind the daemon to")
   .option("--port <number>", "Relay port", parsePositiveInt, 8787)
   .option("--mcp-name <name>", "Codex MCP server name", "walkie-tokie")
   .option("--user <name>", "Your review identity; defaults to USER")
   .option("--token <token>", "Optional bearer token for non-Tailscale deployments")
   .option("--skip-codex", "Only print commands; do not run codex mcp add")
   .action((options) => {
-    const user = options.user ?? process.env.WALKIE_TOKIE_USER ?? process.env.REVIEW_RELAY_USER ?? process.env.USER;
+    const user = options.user ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
     if (!user) {
       throw new Error("Could not infer user. Pass --user <name>.");
     }
@@ -112,7 +112,7 @@ setup
   .option("--token <token>", "Optional bearer token if the author configured one")
   .option("--skip-codex", "Only print commands; do not run codex mcp add")
   .action((options) => {
-    const user = options.user ?? process.env.WALKIE_TOKIE_USER ?? process.env.REVIEW_RELAY_USER ?? process.env.USER;
+    const user = options.user ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
     if (!user) {
       throw new Error("Could not infer user. Pass --user <name>.");
     }
@@ -290,15 +290,12 @@ function configureCodexMcp(input: {
   ];
   if (input.relayUrl) {
     args.push("--env", `WALKIE_TOKIE_URL=${input.relayUrl}`);
-    args.push("--env", `REVIEW_RELAY_URL=${input.relayUrl}`);
   }
   if (input.token) {
     args.push("--env", `WALKIE_TOKIE_TOKEN=${input.token}`);
-    args.push("--env", `REVIEW_RELAY_TOKEN=${input.token}`);
   }
   if (input.user) {
     args.push("--env", `WALKIE_TOKIE_USER=${input.user}`);
-    args.push("--env", `REVIEW_RELAY_USER=${input.user}`);
   }
   args.push("--", process.execPath, siblingBin("walkie-tokie-mcp.js"));
 

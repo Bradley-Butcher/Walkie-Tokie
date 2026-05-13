@@ -19,7 +19,7 @@ import {
   timeoutSecondsSchema,
   waitForMessageMcpSchema,
 } from "../core/schemas.js";
-import { ensureRelaydRunning, relayStatus } from "../daemon/relaySupervisor.js";
+import { ensureDaemonRunning, relayStatus } from "../daemon/relaySupervisor.js";
 
 const client = new RelayHttpClient();
 
@@ -33,7 +33,7 @@ Install it once on every machine. The same tools support both roles.
 
 Preferred author flow:
 1. Call wait_for_message with a human session name, repo, pr, allowedCallers, and capabilities.
-2. wait_for_message starts the local relay daemon if needed, creates review mode if needed, then blocks.
+2. wait_for_message starts the local daemon if needed, creates review mode if needed, then blocks.
 3. When a message arrives, answer it and call reply_to_review_request with the requestId.
 4. Call wait_for_message again to keep accepting review questions.
 
@@ -201,16 +201,16 @@ server.registerTool(
       port: z.number().int().positive().max(65_535).default(8787),
       callerUser: callerNameSchema
         .optional()
-        .describe("Reviewer identity; defaults to WALKIE_TOKIE_USER, REVIEW_RELAY_USER, or USER"),
+        .describe("Reviewer identity; defaults to WALKIE_TOKIE_USER or USER"),
       callerAgent: callerNameSchema.optional().describe("Optional agent name"),
       callerMachine: callerNameSchema.optional().describe("Optional machine name"),
     },
   },
   async (input) => {
     const destination = resolveDestination(input);
-    const callerUser = input.callerUser ?? process.env.WALKIE_TOKIE_USER ?? process.env.REVIEW_RELAY_USER ?? process.env.USER;
+    const callerUser = input.callerUser ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
     if (!callerUser) {
-      throw new Error("callerUser is required when WALKIE_TOKIE_USER, REVIEW_RELAY_USER, and USER are unset");
+      throw new Error("callerUser is required when WALKIE_TOKIE_USER and USER are unset");
     }
 
     const remote = new RelayHttpClient(destination.baseUrl);
@@ -243,15 +243,15 @@ server.registerTool(
       timeoutSeconds: timeoutSecondsSchema(900, 3_600),
       callerUser: callerNameSchema
         .optional()
-        .describe("Reviewer identity; defaults to WALKIE_TOKIE_USER, REVIEW_RELAY_USER, or USER"),
+        .describe("Reviewer identity; defaults to WALKIE_TOKIE_USER or USER"),
       callerAgent: callerNameSchema.optional().describe("Optional agent name"),
       callerMachine: callerNameSchema.optional().describe("Optional machine name"),
     },
   },
   async (input) => {
-    const callerUser = input.callerUser ?? process.env.WALKIE_TOKIE_USER ?? process.env.REVIEW_RELAY_USER ?? process.env.USER;
+    const callerUser = input.callerUser ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
     if (!callerUser) {
-      throw new Error("callerUser is required when WALKIE_TOKIE_USER, REVIEW_RELAY_USER, and USER are unset");
+      throw new Error("callerUser is required when WALKIE_TOKIE_USER and USER are unset");
     }
 
     return jsonResult(
@@ -273,7 +273,7 @@ server.registerTool(
 await server.connect(new StdioServerTransport());
 
 async function ensureLocalRelay() {
-  return await ensureRelaydRunning({ localUrl: client.baseUrl });
+  return await ensureDaemonRunning({ localUrl: client.baseUrl });
 }
 
 function resolveDestination(input: {
@@ -346,7 +346,7 @@ function hasSession(value: unknown, session: string): boolean {
 }
 
 function defaultTarget(repo: string, pr: number): string {
-  const owner = process.env.WALKIE_TOKIE_USER ?? process.env.REVIEW_RELAY_USER ?? process.env.USER ?? "local";
+  const owner = process.env.WALKIE_TOKIE_USER ?? process.env.USER ?? "local";
   return `${owner}/${repo}#${pr}`;
 }
 

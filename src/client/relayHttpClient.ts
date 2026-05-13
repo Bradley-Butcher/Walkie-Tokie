@@ -15,8 +15,8 @@ export class RelayHttpClient {
   readonly token?: string;
 
   constructor(
-    baseUrl = process.env.WALKIE_TOKIE_URL ?? process.env.REVIEW_RELAY_URL ?? "http://127.0.0.1:8787",
-    token = process.env.WALKIE_TOKIE_TOKEN ?? process.env.REVIEW_RELAY_TOKEN,
+    baseUrl = process.env.WALKIE_TOKIE_URL ?? "http://127.0.0.1:8787",
+    token = process.env.WALKIE_TOKIE_TOKEN,
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
     this.token = token;
