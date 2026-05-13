@@ -46,12 +46,10 @@ export interface ReviewEndpoint {
   session: string;
   state: ReviewState;
   capabilities: Capability[];
-  allowedCallers: string[];
   maxPending: number;
 }
 
 export interface Origin {
-  user: string;
   agent?: string;
   machine?: string;
 }
@@ -61,7 +59,7 @@ export interface AskReviewPeerInput {
   question: string;
   mode: Capability;
   timeoutSeconds: number;
-  caller: Origin;
+  caller?: Origin;
   clientRequestId?: string;
 }
 
@@ -88,7 +86,7 @@ export interface DeliveredReviewRequest {
   target: string;
   question: string;
   mode: Capability;
-  origin: Origin;
+  origin?: Origin;
   deadline: string;
 }
 

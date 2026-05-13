@@ -8,7 +8,7 @@ export const targetSchema = z
   .min(3)
   .max(300)
   .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+#\d+$/, {
-    message: "target must look like user/owner/repo#123",
+    message: "target must look like namespace/owner/repo#123",
   });
 
 export const repoSchema = z
@@ -44,7 +44,6 @@ export const timeoutSecondsSchema = (fallback: number, max: number) => {
 
 export const originSchema = z
   .object({
-    user: callerNameSchema,
     agent: callerNameSchema.optional(),
     machine: callerNameSchema.optional(),
   })
@@ -56,7 +55,6 @@ export const startReviewModeSchema = z
     repo: repoSchema,
     pr: z.number().int().positive(),
     session: sessionSchema,
-    allowedCallers: z.array(callerNameSchema).min(1).max(100),
     capabilities: z.array(capabilitySchema).min(1).max(5),
     maxPending: z.number().int().positive().max(100).optional(),
   })
@@ -66,7 +64,6 @@ export const waitForMessageMcpSchema = z.object({
   session_name: sessionSchema,
   repo: repoSchema.optional(),
   pr: z.number().int().positive().optional(),
-  allowedCallers: z.array(callerNameSchema).min(1).max(100).optional(),
   capabilities: z.array(capabilitySchema).min(1).max(5).default(["inspect"]),
   target: targetSchema.optional(),
   timeoutSeconds: timeoutSecondsSchema(43_200, 86_400),
@@ -92,7 +89,7 @@ export const askReviewPeerHttpSchema = z
     question: questionSchema,
     mode: capabilitySchema,
     timeoutSeconds: timeoutSecondsSchema(900, 3_600),
-    caller: originSchema,
+    caller: originSchema.optional(),
     clientRequestId: z.string().min(1).max(200).optional(),
   })
   .strict();
@@ -102,7 +99,7 @@ export const sendSessionMessageHttpSchema = z
     message: questionSchema,
     mode: capabilitySchema.default("inspect"),
     timeoutSeconds: timeoutSecondsSchema(900, 3_600),
-    caller: originSchema,
+    caller: originSchema.optional(),
     clientRequestId: z.string().min(1).max(200).optional(),
   })
   .strict();

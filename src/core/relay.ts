@@ -18,7 +18,7 @@ interface PendingRequest {
   target: string;
   question: string;
   mode: Capability;
-  origin: Origin;
+  origin?: Origin;
   deadlineMs: number;
   status: ReviewRequestStatus;
   resolveAsk: (result: AskReviewPeerResult) => void;
@@ -61,7 +61,6 @@ export class ReviewRelay {
     pr: number;
     session: string;
     capabilities: Capability[];
-    allowedCallers: string[];
     maxPending?: number;
   }): ReviewEndpoint {
     const previousEndpointAtTarget = this.endpoints.get(input.target);
@@ -82,7 +81,6 @@ export class ReviewRelay {
       session: input.session,
       state: "review_idle",
       capabilities: input.capabilities,
-      allowedCallers: input.allowedCallers,
       maxPending: input.maxPending ?? 5,
     };
     this.endpoints.set(endpoint.target, endpoint);
@@ -296,13 +294,6 @@ export class ReviewRelay {
         status: "rejected",
         reason: "paused",
         message: "The author paused review mode.",
-      };
-    }
-    if (!endpoint.allowedCallers.includes(input.caller.user)) {
-      return {
-        status: "rejected",
-        reason: "not_allowed",
-        message: "Caller is not allowed for this endpoint.",
       };
     }
     if (!endpoint.capabilities.includes(input.mode)) {

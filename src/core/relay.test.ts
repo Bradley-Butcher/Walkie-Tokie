@@ -16,7 +16,6 @@ function relay() {
     pr: 1234,
     session: "big-brain-bert",
     capabilities: ["explain", "inspect"],
-    allowedCallers: ["pawel"],
     maxPending: 2,
   });
   return reviewRelay;
@@ -36,13 +35,11 @@ describe("ReviewRelay", () => {
       question: "Why is validation below the gRPC boundary?",
       mode: "inspect",
       timeoutSeconds: 30,
-      caller: { user: "pawel", agent: "pawel-codex" },
     });
 
     const waitResult = await wait;
     assert.equal(waitResult.status, "request");
     assert.equal(waitResult.request?.requestId, "req_1");
-    assert.equal(waitResult.request?.origin.user, "pawel");
 
     reviewRelay.replyToReviewRequest({
       requestId: "req_1",
@@ -69,7 +66,6 @@ describe("ReviewRelay", () => {
       question: "Can I address this by session name?",
       mode: "inspect",
       timeoutSeconds: 30,
-      caller: { user: "pawel" },
     });
 
     const waitResult = await wait;
@@ -93,14 +89,12 @@ describe("ReviewRelay", () => {
       question: "First?",
       mode: "inspect",
       timeoutSeconds: 30,
-      caller: { user: "pawel" },
     });
     const secondAsk = reviewRelay.askReviewPeer({
       target,
       question: "Second?",
       mode: "inspect",
       timeoutSeconds: 30,
-      caller: { user: "pawel" },
     });
 
     const firstWait = await reviewRelay.waitForReviewRequest({
@@ -133,21 +127,6 @@ describe("ReviewRelay", () => {
     assert.equal((await secondAsk).answer, "Second answer");
   });
 
-  it("rejects unauthorized callers without blocking", async () => {
-    const reviewRelay = relay();
-
-    const result = await reviewRelay.askReviewPeer({
-      target,
-      question: "Can I ask?",
-      mode: "inspect",
-      timeoutSeconds: 30,
-      caller: { user: "mallory" },
-    });
-
-    assert.equal(result.status, "rejected");
-    assert.equal(result.reason, "not_allowed");
-  });
-
   it("rejects when the queue is full", async () => {
     const reviewRelay = relay();
 
@@ -156,21 +135,18 @@ describe("ReviewRelay", () => {
       question: "First?",
       mode: "inspect",
       timeoutSeconds: 30,
-      caller: { user: "pawel" },
     });
     const secondAsk = reviewRelay.askReviewPeer({
       target,
       question: "Second?",
       mode: "inspect",
       timeoutSeconds: 30,
-      caller: { user: "pawel" },
     });
     const thirdAsk = reviewRelay.askReviewPeer({
       target,
       question: "Third?",
       mode: "inspect",
       timeoutSeconds: 30,
-      caller: { user: "pawel" },
     });
 
     const thirdResult = await thirdAsk;
@@ -200,7 +176,6 @@ describe("ReviewRelay", () => {
       question: "Will this be cancelled?",
       mode: "inspect",
       timeoutSeconds: 30,
-      caller: { user: "pawel" },
     });
 
     const delivered = await reviewRelay.waitForReviewRequest({
@@ -236,7 +211,6 @@ describe("ReviewRelay", () => {
       pr: 1234,
       session: "big-brain-bert-v2",
       capabilities: ["inspect"],
-      allowedCallers: ["pawel"],
     });
 
     assert.deepEqual(await staleWait, { status: "timeout" });
@@ -250,7 +224,6 @@ describe("ReviewRelay", () => {
       question: "Fresh request?",
       mode: "inspect",
       timeoutSeconds: 30,
-      caller: { user: "pawel" },
     });
 
     const delivered = await freshWait;

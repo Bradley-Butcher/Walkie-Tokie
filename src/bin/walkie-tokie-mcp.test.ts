@@ -22,7 +22,6 @@ describe("walkie-tokie-mcp", () => {
       env: {
         ...getDefaultEnvironment(),
         WALKIE_TOKIE_URL: serverUrl(app.server.address() as AddressInfo),
-        WALKIE_TOKIE_USER: "pawel",
       },
       stderr: "pipe",
     });
@@ -44,7 +43,6 @@ describe("walkie-tokie-mcp", () => {
         repo: "withcoral/coral",
         pr: 1234,
         session: "big-brain-bert",
-        allowedCallers: ["pawel"],
         capabilities: ["inspect"],
       });
 
@@ -62,7 +60,6 @@ describe("walkie-tokie-mcp", () => {
       const delivered = await wait;
       assert.equal(delivered.status, "request");
       assert.equal(delivered.request.question, "Why is validation below the gRPC boundary?");
-      assert.equal(delivered.request.origin.user, "pawel");
 
       await callJson(client, "reply_to_review_request", {
         requestId: delivered.request.requestId,
@@ -107,7 +104,6 @@ describe("walkie-tokie-mcp", () => {
         session_name: "auto-start-bert",
         repo: "withcoral/coral",
         pr: 5678,
-        allowedCallers: ["pawel"],
         capabilities: ["inspect"],
         timeoutSeconds: 5,
       });

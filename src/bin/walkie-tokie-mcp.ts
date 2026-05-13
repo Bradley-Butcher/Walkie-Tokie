@@ -7,7 +7,6 @@ import { parseRecipientAddress } from "../client/recipient.js";
 import { RelayHttpClient } from "../client/relayHttpClient.js";
 import {
   answerSchema,
-  callerNameSchema,
   capabilitySchema,
   hostSchema,
   questionSchema,
@@ -32,7 +31,7 @@ const server = new McpServer({
 Install it once on every machine. The same tools support both roles.
 
 Preferred author flow:
-1. Call wait_for_message with a human session name, repo, pr, allowedCallers, and capabilities.
+1. Call wait_for_message with a human session name, repo, pr, and capabilities.
 2. wait_for_message starts the local daemon if needed, creates review mode if needed, then blocks.
 3. When a message arrives, answer it and call reply_to_review_request with the requestId.
 4. Call wait_for_message again to keep accepting review questions.
@@ -86,7 +85,6 @@ server.registerTool(
       repo: repoSchema.describe("Repository in owner/name form"),
       pr: z.number().int().positive().describe("Pull request number"),
       session: sessionSchema.describe("Human-friendly Codex session name or id"),
-      allowedCallers: z.array(callerNameSchema).min(1).describe("Allowed reviewer identities"),
       capabilities: z.array(capabilitySchema).min(1).describe("Capabilities reviewers may request"),
       maxPending: z.number().int().positive().max(100).optional().describe("Maximum queued questions"),
     },
@@ -139,15 +137,10 @@ server.registerTool(
       session_name: sessionSchema.describe("Author's review session name, such as big-lad-john"),
       repo: repoSchema.optional().describe("Repository in owner/name form. Required when creating review mode."),
       pr: z.number().int().positive().optional().describe("Pull request number. Required when creating review mode."),
-      allowedCallers: z
-        .array(callerNameSchema)
-        .min(1)
-        .optional()
-        .describe("Allowed reviewer identities. Required when creating review mode."),
       capabilities: z.array(capabilitySchema).min(1).default(["inspect"]),
       target: targetSchema
         .optional()
-        .describe("Optional endpoint id. Defaults to local-user/repo#pr when repo and pr are supplied."),
+        .describe("Optional endpoint id. Defaults to local/repo#pr when repo and pr are supplied."),
       maxPending: z.number().int().positive().max(100).optional(),
       timeoutSeconds: timeoutSecondsSchema(43_200, 86_400),
     },
@@ -199,19 +192,10 @@ server.registerTool(
       mode: capabilitySchema.default("inspect"),
       timeoutSeconds: timeoutSecondsSchema(900, 3_600),
       port: z.number().int().positive().max(65_535).default(8787),
-      callerUser: callerNameSchema
-        .optional()
-        .describe("Reviewer identity; defaults to WALKIE_TOKIE_USER or USER"),
-      callerAgent: callerNameSchema.optional().describe("Optional agent name"),
-      callerMachine: callerNameSchema.optional().describe("Optional machine name"),
     },
   },
   async (input) => {
     const destination = resolveDestination(input);
-    const callerUser = input.callerUser ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
-    if (!callerUser) {
-      throw new Error("callerUser is required when WALKIE_TOKIE_USER and USER are unset");
-    }
 
     const remote = new RelayHttpClient(destination.baseUrl);
     const path = `/v1/sessions/${encodeURIComponent(destination.sessionName)}/messages/wait`;
@@ -220,11 +204,6 @@ server.registerTool(
         message: input.message,
         mode: input.mode,
         timeoutSeconds: input.timeoutSeconds,
-        caller: {
-          user: callerUser,
-          agent: input.callerAgent,
-          machine: input.callerMachine,
-        },
       }),
     );
   },
@@ -241,30 +220,15 @@ server.registerTool(
       question: questionSchema,
       mode: capabilitySchema.default("inspect"),
       timeoutSeconds: timeoutSecondsSchema(900, 3_600),
-      callerUser: callerNameSchema
-        .optional()
-        .describe("Reviewer identity; defaults to WALKIE_TOKIE_USER or USER"),
-      callerAgent: callerNameSchema.optional().describe("Optional agent name"),
-      callerMachine: callerNameSchema.optional().describe("Optional machine name"),
     },
   },
   async (input) => {
-    const callerUser = input.callerUser ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
-    if (!callerUser) {
-      throw new Error("callerUser is required when WALKIE_TOKIE_USER and USER are unset");
-    }
-
     return jsonResult(
       await client.post("/v1/review-requests:wait", {
         target: input.target,
         question: input.question,
         mode: input.mode,
         timeoutSeconds: input.timeoutSeconds,
-        caller: {
-          user: callerUser,
-          agent: input.callerAgent,
-          machine: input.callerMachine,
-        },
       }),
     );
   },
@@ -304,7 +268,6 @@ async function ensureReviewMode(input: {
   session_name: string;
   repo?: string;
   pr?: number;
-  allowedCallers?: string[];
   capabilities: string[];
   target?: string;
   maxPending?: number;
@@ -314,9 +277,9 @@ async function ensureReviewMode(input: {
     return;
   }
 
-  if (!input.repo || !input.pr || !input.allowedCallers) {
+  if (!input.repo || !input.pr) {
     throw new Error(
-      "Review mode is not active for this session. Provide repo, pr, and allowedCallers " +
+      "Review mode is not active for this session. Provide repo and pr " +
         "the first time you call wait_for_message.",
     );
   }
@@ -326,7 +289,6 @@ async function ensureReviewMode(input: {
     repo: input.repo,
     pr: input.pr,
     session: input.session_name,
-    allowedCallers: input.allowedCallers,
     capabilities: input.capabilities,
     maxPending: input.maxPending,
   });
@@ -346,8 +308,7 @@ function hasSession(value: unknown, session: string): boolean {
 }
 
 function defaultTarget(repo: string, pr: number): string {
-  const owner = process.env.WALKIE_TOKIE_USER ?? process.env.USER ?? "local";
-  return `${owner}/${repo}#${pr}`;
+  return `local/${repo}#${pr}`;
 }
 
 function jsonResult(value: unknown) {

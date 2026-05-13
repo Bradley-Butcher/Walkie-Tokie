@@ -18,30 +18,22 @@ const mcp = program.command("mcp").description("Manage the Codex MCP integration
 mcp
   .command("install")
   .description("Install the role-neutral Walkie Tokie MCP server into Codex")
-  .option("--user <name>", "Your review identity; defaults to USER")
   .option("--mcp-name <name>", "Codex MCP server name", "walkie-tokie")
   .option("--relay-url <url>", "Optional local relay URL for author-side tools", "http://127.0.0.1:8787")
   .option("--token <token>", "Optional bearer token for non-Tailscale deployments")
   .option("--skip-codex", "Only print commands; do not run codex mcp add")
   .action((options) => {
-    const user = options.user ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
-    if (!user) {
-      throw new Error("Could not infer user. Pass --user <name>.");
-    }
-
     if (!options.skipCodex) {
       configureCodexMcp({
         name: options.mcpName,
         relayUrl: options.relayUrl,
         token: options.token,
-        user,
       });
     }
 
     printSetupSummary({
       title: "Walkie Tokie MCP installed",
       lines: [
-        `Review identity: ${user}`,
         `Local relay URL: ${options.relayUrl}`,
         "Reviewer use: send_message(to, message)",
         "Author use: call wait_for_message; it starts walkie-tokied when needed",
@@ -59,15 +51,9 @@ setup
   .option("--host <ip>", "Tailscale IPv4 address to bind the daemon to")
   .option("--port <number>", "Relay port", parsePositiveInt, 8787)
   .option("--mcp-name <name>", "Codex MCP server name", "walkie-tokie")
-  .option("--user <name>", "Your review identity; defaults to USER")
   .option("--token <token>", "Optional bearer token for non-Tailscale deployments")
   .option("--skip-codex", "Only print commands; do not run codex mcp add")
   .action((options) => {
-    const user = options.user ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
-    if (!user) {
-      throw new Error("Could not infer user. Pass --user <name>.");
-    }
-
     const host = options.host ?? detectTailscaleIpv4();
     if (!host) {
       throw new Error(
@@ -83,7 +69,6 @@ setup
         name: options.mcpName,
         relayUrl: localRelayUrl,
         token: options.token,
-        user,
       });
     }
 
@@ -106,30 +91,22 @@ setup
 
 setup
   .command("reviewer")
-  .description("Compatibility alias for `walkie-tokie mcp install --user <name>`")
-  .option("--user <name>", "Your review identity; defaults to USER")
+  .description("Compatibility alias for `walkie-tokie mcp install`")
   .option("--mcp-name <name>", "Codex MCP server name", "walkie-tokie")
   .option("--token <token>", "Optional bearer token if the author configured one")
   .option("--skip-codex", "Only print commands; do not run codex mcp add")
   .action((options) => {
-    const user = options.user ?? process.env.WALKIE_TOKIE_USER ?? process.env.USER;
-    if (!user) {
-      throw new Error("Could not infer user. Pass --user <name>.");
-    }
-
     if (!options.skipCodex) {
       configureCodexMcp({
         name: options.mcpName,
         token: options.token,
         relayUrl: "http://127.0.0.1:8787",
-        user,
       });
     }
 
     printSetupSummary({
       title: "Walkie Tokie MCP installed",
       lines: [
-        `Review identity: ${user}`,
         "Your agent can now call send_message(to, message).",
       ],
     });
@@ -144,7 +121,6 @@ reviewMode
   .requiredOption("--repo <repo>", "Repository in owner/name form")
   .requiredOption("--pr <number>", "Pull request number", parsePositiveInt)
   .requiredOption("--session <id>", "Human-friendly Codex session id")
-  .requiredOption("--allow <caller>", "Allowed reviewer identity", collect, [])
   .requiredOption("--capability <mode>", "Allowed capability", collectCapability, [])
   .option("--max-pending <number>", "Maximum queued requests", parsePositiveInt)
   .action(async (options) => {
@@ -153,7 +129,6 @@ reviewMode
       repo: options.repo,
       pr: options.pr,
       session: options.session,
-      allowedCallers: options.allow,
       capabilities: options.capability,
       maxPending: options.maxPending,
     });
@@ -195,7 +170,6 @@ program
   .requiredOption("--question <text>", "Question for the author agent")
   .requiredOption("--mode <capability>", "Requested capability", parseCapability)
   .requiredOption("--timeout <duration>", "Timeout, such as 30s or 15m", parseDurationSeconds)
-  .requiredOption("--user <name>", "Reviewer identity")
   .option("--agent <name>", "Reviewer agent name")
   .option("--machine <name>", "Reviewer machine name")
   .action(async (options) => {
@@ -204,11 +178,12 @@ program
       question: options.question,
       mode: options.mode,
       timeoutSeconds: options.timeout,
-      caller: {
-        user: options.user,
-        agent: options.agent,
-        machine: options.machine,
-      },
+      caller: options.agent || options.machine
+        ? {
+            agent: options.agent,
+            machine: options.machine,
+          }
+        : undefined,
     });
   });
 
@@ -234,11 +209,6 @@ async function post(path: string, body: Record<string, unknown>) {
 
 function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value)}\n`);
-}
-
-function collect(value: string, previous: string[]): string[] {
-  previous.push(value);
-  return previous;
 }
 
 function collectCapability(value: string, previous: string[]): string[] {
@@ -279,7 +249,6 @@ function configureCodexMcp(input: {
   name: string;
   relayUrl?: string;
   token?: string;
-  user?: string;
 }): void {
   runCodex(["mcp", "remove", input.name], { allowFailure: true });
 
@@ -293,9 +262,6 @@ function configureCodexMcp(input: {
   }
   if (input.token) {
     args.push("--env", `WALKIE_TOKIE_TOKEN=${input.token}`);
-  }
-  if (input.user) {
-    args.push("--env", `WALKIE_TOKIE_USER=${input.user}`);
   }
   args.push("--", process.execPath, siblingBin("walkie-tokie-mcp.js"));
 

@@ -46,7 +46,6 @@ describe("relay HTTP server", () => {
           repo: "withcoral/coral",
           pr: 1234,
           session: "big-brain-bert",
-          allowedCallers: ["pawel"],
           capabilities: ["inspect"],
         },
       });
@@ -76,7 +75,6 @@ describe("relay HTTP server", () => {
           repo: "withcoral/coral",
           pr: 1234,
           session: "big-brain-bert",
-          allowedCallers: ["pawel"],
           capabilities: ["inspect"],
         },
       });
@@ -99,9 +97,6 @@ describe("relay HTTP server", () => {
           question: "What invariant makes this safe?",
           mode: "inspect",
           timeoutSeconds: 5,
-          caller: {
-            user: "pawel",
-          },
         },
       });
 
@@ -142,7 +137,6 @@ describe("relay HTTP server", () => {
           repo: "withcoral/coral",
           pr: 1234,
           session: "big-lad-john",
-          allowedCallers: ["pawel"],
           capabilities: ["inspect"],
         },
       });
@@ -162,9 +156,6 @@ describe("relay HTTP server", () => {
           message: "Can I send by session name?",
           mode: "inspect",
           timeoutSeconds: 5,
-          caller: {
-            user: "pawel",
-          },
         },
       });
 
