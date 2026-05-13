@@ -8,6 +8,7 @@ import Fastify, {
 } from "fastify";
 import * as z from "zod/v4";
 import { ReviewRelay } from "../core/relay.js";
+import { isAllowedUnauthenticatedPeerAddress } from "../core/tailscale.js";
 import {
   askReviewPeerHttpSchema,
   closeReviewModeSchema,
@@ -19,6 +20,7 @@ import {
   waitForReviewRequestSchema,
 } from "../core/schemas.js";
 import { RelayError } from "../core/types.js";
+export { isTailscaleIpv4 } from "../core/tailscale.js";
 
 const jsonBodyLimitBytes = 128 * 1024;
 
@@ -49,6 +51,16 @@ export function createRelayHttpServer(options: RelayHttpServerOptions = {}) {
       const authorization = request.headers.authorization;
       if (!isBearerToken(authorization, token)) {
         throw new RelayError("not_allowed", "Missing or invalid Walkie Tokie token", 401);
+      }
+    });
+  } else {
+    app.addHook("onRequest", async (request) => {
+      if (!isAllowedUnauthenticatedPeerAddress(request.ip)) {
+        throw new RelayError(
+          "not_allowed",
+          "Walkie Tokie accepts unauthenticated requests only from localhost or Tailscale peers",
+          403,
+        );
       }
     });
   }
@@ -148,18 +160,6 @@ export function createRelayHttpServer(options: RelayHttpServerOptions = {}) {
 
 export function isLocalBindHost(host: string): boolean {
   return host === "127.0.0.1" || host === "::1" || host === "localhost";
-}
-
-export function isTailscaleIpv4(host: string): boolean {
-  const parts = host.split(".").map((part) => Number.parseInt(part, 10));
-  if (
-    parts.length !== 4 ||
-    parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
-  ) {
-    return false;
-  }
-
-  return parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
 }
 
 export function isWildcardBindHost(host: string): boolean {

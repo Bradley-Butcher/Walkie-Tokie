@@ -35,6 +35,43 @@ describe("relay HTTP server", () => {
     }
   });
 
+  it("allows unauthenticated localhost and Tailscale peers", async () => {
+    const { app } = createRelayHttpServer();
+    try {
+      const local = await app.inject({
+        method: "GET",
+        url: "/v1/review-endpoints",
+        remoteAddress: "127.0.0.1",
+      });
+      assert.equal(local.statusCode, 200);
+
+      const tailnet = await app.inject({
+        method: "GET",
+        url: "/v1/review-endpoints",
+        remoteAddress: "100.78.16.74",
+      });
+      assert.equal(tailnet.statusCode, 200);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("rejects unauthenticated LAN peers even when the daemon is bound broadly", async () => {
+    const { app } = createRelayHttpServer();
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/review-endpoints",
+        remoteAddress: "192.168.1.20",
+      });
+
+      assert.equal(response.statusCode, 403);
+      assert.equal(response.json().error.code, "not_allowed");
+    } finally {
+      await app.close();
+    }
+  });
+
   it("rejects invalid endpoint ids before mutating relay state", async () => {
     const { app } = createRelayHttpServer();
     try {

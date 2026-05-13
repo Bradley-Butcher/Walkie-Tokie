@@ -1,5 +1,6 @@
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { detectTailscaleIpv4 } from "../core/tailscale.js";
 
 export interface RelaySupervisorOptions {
   localUrl?: string;
@@ -28,6 +29,7 @@ type SpawnProcess = (
 ) => Pick<ChildProcess, "pid" | "unref">;
 
 const defaultPort = 8787;
+const defaultBindHost = "0.0.0.0";
 
 export async function ensureDaemonRunning(
   options: RelaySupervisorOptions = {},
@@ -40,16 +42,10 @@ export async function ensureDaemonRunning(
     return { running: true, localUrl };
   }
 
-  const publicHost = (options.detectTailscaleIp ?? detectTailscaleIp)();
-  if (!publicHost) {
-    throw new Error(
-      "walkie-tokied is not running and no Tailscale IPv4 address was found. " +
-        "Install Tailscale, run `tailscale up`, or start walkie-tokied manually.",
-    );
-  }
+  const publicHost = (options.detectTailscaleIp ?? detectTailscaleIpv4)();
 
   const child = startDaemon({
-    host: publicHost,
+    host: defaultBindHost,
     port,
     daemonPath: options.daemonPath,
     spawnProcess: options.spawnProcess,
@@ -64,7 +60,7 @@ export async function ensureDaemonRunning(
     running: true,
     localUrl,
     publicHost,
-    publicUrl: `http://${publicHost}:${port}`,
+    publicUrl: publicHost ? `http://${publicHost}:${port}` : undefined,
     pid: child.pid,
     started: true,
   };
@@ -75,7 +71,7 @@ export async function relayStatus(options: RelaySupervisorOptions = {}): Promise
   const localUrl = options.localUrl ?? `http://127.0.0.1:${port}`;
   const fetchImpl = options.fetch ?? fetch;
   const running = await isHealthy(localUrl, fetchImpl);
-  const publicHost = (options.detectTailscaleIp ?? detectTailscaleIp)();
+  const publicHost = (options.detectTailscaleIp ?? detectTailscaleIpv4)();
   return {
     running,
     localUrl,
@@ -128,20 +124,6 @@ async function waitForHealth(
     await sleep(options.pollIntervalMs);
   }
   throw new Error(`walkie-tokied did not become healthy at ${localUrl}`);
-}
-
-function detectTailscaleIp(): string | undefined {
-  const result = spawnSync("tailscale", ["ip", "-4"], {
-    encoding: "utf8",
-    stdio: "pipe",
-  });
-  if (result.status !== 0) {
-    return undefined;
-  }
-  return result.stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => line.length > 0);
 }
 
 function sleep(ms: number): Promise<void> {
