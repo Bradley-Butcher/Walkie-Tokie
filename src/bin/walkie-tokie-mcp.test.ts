@@ -100,6 +100,30 @@ describe("walkie-tokie-mcp", () => {
         answer: "Yes, the MCP tool routes by host and session.",
       });
 
+      const triggerWait = callJson(client, "wait_for_message", {
+        session_name: "big-brain-bert",
+        timeoutSeconds: 5,
+      });
+      const triggerAsk = callJson(client, "send_message", {
+        trigger: `walkie-tokie/127.0.0.1:${address.port}/big-brain-bert Does the trigger work?`,
+        timeoutSeconds: 5,
+      });
+
+      const triggerDelivered = await triggerWait;
+      assert.equal(triggerDelivered.status, "request");
+      assert.equal(triggerDelivered.request.question, "Does the trigger work?");
+
+      await callJson(client, "reply_to_review_request", {
+        requestId: triggerDelivered.request.requestId,
+        answer: "Yes, the copy-paste trigger routes to send_message.",
+      });
+
+      assert.deepEqual(await triggerAsk, {
+        requestId: triggerDelivered.request.requestId,
+        status: "answered",
+        answer: "Yes, the copy-paste trigger routes to send_message.",
+      });
+
       const autoWait = callJson(client, "wait_for_message", {
         session_name: "auto-start-bert",
         repo: "withcoral/coral",

@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
 import { relayBaseUrlFromHost } from "../client/relayAddress.js";
-import { parseRecipientAddress } from "../client/recipient.js";
+import { parseRecipientAddress, parseWalkieTokieTrigger } from "../client/recipient.js";
 import { RelayHttpClient } from "../client/relayHttpClient.js";
 import {
   answerSchema,
@@ -38,8 +38,9 @@ Preferred author flow:
 
 Preferred reviewer flow:
 1. Ask the author for their recipient identifier, shaped like host/session-name, for example brad-laptop/big-lad-john.
-2. Call send_message with to=<recipient identifier> and message=<question>.
-3. The call blocks until the author answers, rejects, closes review mode, or the timeout expires.
+2. If the user pastes a string shaped like "walkie-tokie/<host>/<session> <question>", call send_message with trigger=<that whole string>.
+3. Otherwise call send_message with to=<recipient identifier> and message=<question>.
+4. The call blocks until the author answers, rejects, closes review mode, or the timeout expires.
 
 Use relay_status for debugging local relay reachability. Use start_review_mode, wait_for_review_request, and ask_review_peer only as lower-level/debug primitives. Do not ask users to manually start walkie-tokied in the normal flow.`,
 });
@@ -179,6 +180,12 @@ server.registerTool(
     description:
       "Send a blocking message to a named Codex review session on another Tailscale host.",
     inputSchema: {
+      trigger: z
+        .string()
+        .min(1)
+        .max(20_700)
+        .optional()
+        .describe("Full copy-paste trigger, such as walkie-tokie/brad-laptop/big-lad-john Why is this safe?"),
       to: recipientSchema
         .optional()
         .describe("Recipient identifier, such as brad-laptop/big-lad-john"),
@@ -188,20 +195,20 @@ server.registerTool(
       session_name: sessionSchema
         .optional()
         .describe("Remote review session name, such as big-lad-john"),
-      message: questionSchema.describe("Message or question for the remote agent"),
+      message: questionSchema.optional().describe("Message or question for the remote agent"),
       mode: capabilitySchema.default("inspect"),
       timeoutSeconds: timeoutSecondsSchema(900, 3_600),
       port: z.number().int().positive().max(65_535).default(8787),
     },
   },
   async (input) => {
-    const destination = resolveDestination(input);
+    const ask = resolveSendMessageInput(input);
 
-    const remote = new RelayHttpClient(destination.baseUrl);
-    const path = `/v1/sessions/${encodeURIComponent(destination.sessionName)}/messages/wait`;
+    const remote = new RelayHttpClient(ask.baseUrl);
+    const path = `/v1/sessions/${encodeURIComponent(ask.sessionName)}/messages/wait`;
     return jsonResult(
       await remote.post(path, {
-        message: input.message,
+        message: ask.message,
         mode: input.mode,
         timeoutSeconds: input.timeoutSeconds,
       }),
@@ -261,6 +268,36 @@ function resolveDestination(input: {
   return {
     baseUrl: relayBaseUrlFromHost(input.host, input.port),
     sessionName: input.session_name,
+  };
+}
+
+function resolveSendMessageInput(input: {
+  trigger?: string;
+  to?: string;
+  host?: string;
+  session_name?: string;
+  message?: string;
+  port: number;
+}): { baseUrl: string; sessionName: string; message: string } {
+  if (input.trigger) {
+    if (input.to || input.host || input.session_name || input.message) {
+      throw new Error("send_message trigger cannot be combined with to, host, session_name, or message");
+    }
+    const parsed = parseWalkieTokieTrigger(input.trigger, input.port);
+    return {
+      baseUrl: parsed.recipient.baseUrl,
+      sessionName: parsed.recipient.sessionName,
+      message: parsed.question,
+    };
+  }
+
+  if (!input.message) {
+    throw new Error("send_message requires `message` unless `trigger` is supplied");
+  }
+
+  return {
+    ...resolveDestination(input),
+    message: input.message,
   };
 }
 

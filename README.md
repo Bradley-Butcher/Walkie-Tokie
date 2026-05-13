@@ -17,6 +17,17 @@ npm install -g git+https://github.com/Bradley-Butcher/Walkie-Tokie.git
 walkie-tokie mcp install
 ```
 
+## Ask
+
+Authors can share a copy-paste trigger in a PR:
+
+```text
+walkie-tokie/brad-laptop/big-lad-john <question>
+```
+
+When an MCP-enabled agent sees that shape, it should call `send_message` with
+the full string as `trigger`.
+
 ## Development
 
 ```shell
