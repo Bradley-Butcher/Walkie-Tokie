@@ -1,0 +1,55 @@
+{
+  "name": "walkie-tokie",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent-to-agent review questions for parked coding sessions.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bradley-Butcher/Walkie-Tokie.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Bradley-Butcher/Walkie-Tokie/issues"
+  },
+  "homepage": "https://github.com/Bradley-Butcher/Walkie-Tokie#readme",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs",
+    "examples",
+    "spec"
+  ],
+  "scripts": {
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "check": "npm run build && npm test",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "dev:mcp": "tsx src/bin/walkie-tokie-mcp.ts",
+    "dev:relayd": "tsx src/bin/walkie-tokied.ts",
+    "prepare": "npm run build",
+    "review-relay": "tsx src/bin/walkie-tokie.ts",
+    "walkie-tokie": "tsx src/bin/walkie-tokie.ts",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "bin": {
+    "walkie-tokie": "./dist/bin/walkie-tokie.js",
+    "walkie-tokie-mcp": "./dist/bin/walkie-tokie-mcp.js",
+    "walkie-tokied": "./dist/bin/walkie-tokied.js",
+    "review-relayd": "./dist/bin/walkie-tokied.js",
+    "review-relay": "./dist/bin/walkie-tokie.js",
+    "review-relay-mcp": "./dist/bin/walkie-tokie-mcp.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "commander": "^14.0.3",
+    "fastify": "^5.8.5",
+    "zod": "^4.4.3"
+  }
+}

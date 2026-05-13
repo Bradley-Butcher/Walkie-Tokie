@@ -1,0 +1,469 @@
+openapi: 3.1.0
+info:
+  title: Walkie Tokie API
+  version: 2026-05-13
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Relay is running
+  /v1/review-endpoints:
+    get:
+      summary: List review endpoints visible to the caller
+      responses:
+        "200":
+          description: Visible review endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [endpoints]
+                properties:
+                  endpoints:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewEndpoint"
+        "401":
+          $ref: "#/components/responses/Error"
+  /v1/review-mode/start:
+    post:
+      summary: Create or replace a review endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartReviewMode"
+      responses:
+        "200":
+          description: Review endpoint started
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [endpoint]
+                properties:
+                  endpoint:
+                    $ref: "#/components/schemas/ReviewEndpoint"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+  /v1/review-mode/close:
+    post:
+      summary: Close a review endpoint and cancel queued or active requests
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target]
+              properties:
+                target:
+                  $ref: "#/components/schemas/Target"
+      responses:
+        "200":
+          description: Review endpoint closed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [target, status]
+                properties:
+                  target:
+                    $ref: "#/components/schemas/Target"
+                  status:
+                    type: string
+                    enum: [closed]
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/author/wait:
+    post:
+      summary: Author-side blocking wait for the next review request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint:
+                  $ref: "#/components/schemas/Target"
+                timeoutSeconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 86400
+                  default: 43200
+      responses:
+        "200":
+          description: A request arrived or the wait timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitForReviewRequestResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /v1/review-requests:wait:
+    post:
+      summary: Create a review request and wait for the author answer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AskReviewPeerRequest"
+      responses:
+        "200":
+          description: Answered, rejected, cancelled, or timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AskReviewPeerResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/sessions/{sessionName}/messages/wait:
+    post:
+      summary: Send a message to a named review session and wait for the answer
+      parameters:
+        - name: sessionName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendSessionMessageRequest"
+      responses:
+        "200":
+          description: Answered, rejected, cancelled, or timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AskReviewPeerResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/sessions/{sessionName}/wait:
+    post:
+      summary: Author-side blocking wait for a named review session
+      parameters:
+        - name: sessionName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timeoutSeconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 86400
+                  default: 43200
+              additionalProperties: false
+      responses:
+        "200":
+          description: A request arrived or the wait timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitForReviewRequestResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/review-requests/{requestId}/reply:
+    post:
+      summary: Complete a review request from the author-side wait loop
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplyToReviewRequest"
+      responses:
+        "200":
+          description: Reply accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, status]
+                properties:
+                  requestId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [sent]
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Target:
+      type: string
+      pattern: "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+#[0-9]+$"
+      examples: ["brad/withcoral/coral#1234"]
+    Repo:
+      type: string
+      pattern: "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$"
+      examples: ["withcoral/coral"]
+    Capability:
+      type: string
+      enum: [explain, inspect, verify, propose, write]
+    Origin:
+      type: object
+      required: [user]
+      properties:
+        user:
+          type: string
+        agent:
+          type: string
+        machine:
+          type: string
+      additionalProperties: false
+    ReviewEndpoint:
+      type: object
+      required: [target, repo, pr, session, state, capabilities, allowedCallers, maxPending]
+      properties:
+        target:
+          $ref: "#/components/schemas/Target"
+        repo:
+          $ref: "#/components/schemas/Repo"
+        pr:
+          type: integer
+          minimum: 1
+        session:
+          type: string
+        state:
+          $ref: "#/components/schemas/ReviewState"
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Capability"
+        allowedCallers:
+          type: array
+          items:
+            type: string
+        maxPending:
+          type: integer
+          minimum: 1
+    StartReviewMode:
+      type: object
+      required: [target, repo, pr, session, allowedCallers, capabilities]
+      properties:
+        target:
+          $ref: "#/components/schemas/Target"
+        repo:
+          $ref: "#/components/schemas/Repo"
+        pr:
+          type: integer
+          minimum: 1
+        session:
+          type: string
+        allowedCallers:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        capabilities:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Capability"
+        maxPending:
+          type: integer
+          minimum: 1
+          maximum: 100
+      additionalProperties: false
+    AskReviewPeerRequest:
+      type: object
+      required: [target, question, mode, caller]
+      properties:
+        target:
+          $ref: "#/components/schemas/Target"
+        question:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        mode:
+          $ref: "#/components/schemas/Capability"
+        caller:
+          $ref: "#/components/schemas/Origin"
+        clientRequestId:
+          type: string
+          maxLength: 200
+        timeoutSeconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+          default: 900
+      additionalProperties: false
+    SendSessionMessageRequest:
+      type: object
+      required: [message, caller]
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        mode:
+          $ref: "#/components/schemas/Capability"
+        caller:
+          $ref: "#/components/schemas/Origin"
+        clientRequestId:
+          type: string
+          maxLength: 200
+        timeoutSeconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+          default: 900
+      additionalProperties: false
+    AskReviewPeerResponse:
+      type: object
+      required: [status]
+      properties:
+        requestId:
+          type: string
+        status:
+          type: string
+          enum: [answered, rejected, timeout, cancelled]
+        answer:
+          type: string
+        reason:
+          type: string
+        message:
+          type: string
+      additionalProperties: false
+    WaitForReviewRequestResponse:
+      oneOf:
+        - type: object
+          required: [status, request]
+          properties:
+            status:
+              type: string
+              enum: [request]
+            request:
+              $ref: "#/components/schemas/DeliveredReviewRequest"
+          additionalProperties: false
+        - type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [timeout]
+          additionalProperties: false
+    DeliveredReviewRequest:
+      type: object
+      required: [requestId, target, question, mode, origin, deadline]
+      properties:
+        requestId:
+          type: string
+        target:
+          $ref: "#/components/schemas/Target"
+        question:
+          type: string
+        mode:
+          $ref: "#/components/schemas/Capability"
+        origin:
+          $ref: "#/components/schemas/Origin"
+        deadline:
+          type: string
+          format: date-time
+      additionalProperties: false
+    ReplyToReviewRequest:
+      type: object
+      required: [answer]
+      properties:
+        answer:
+          type: string
+          minLength: 1
+          maxLength: 100000
+        evidence:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum: [file, command, url, note]
+              path:
+                type: string
+              line:
+                type: integer
+                minimum: 1
+              command:
+                type: string
+              url:
+                type: string
+                format: uri
+              note:
+                type: string
+            additionalProperties: false
+      additionalProperties: false
+    ReviewState:
+      type: string
+      enum: [authoring, review_idle, waiting, answering, paused, closed]
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - not_found
+                - not_allowed
+                - not_in_review_mode
+                - paused
+                - busy
+                - unsupported_mode
+                - timeout
+                - waiter_disconnected
+                - invalid_request
+                - internal_error
+            message:
+              type: string
+            issues:
+              type: object
