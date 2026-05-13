@@ -22,6 +22,7 @@ describe("walkie-tokie-mcp", () => {
       env: {
         ...getDefaultEnvironment(),
         WALKIE_TOKIE_URL: serverUrl(app.server.address() as AddressInfo),
+        WALKIE_TOKIE_PUBLIC_HOST: "alice-laptop",
       },
       stderr: "pipe",
     });
@@ -30,10 +31,13 @@ describe("walkie-tokie-mcp", () => {
     try {
       await client.connect(transport);
       assert.match(client.getInstructions() ?? "", /Preferred reviewer flow/);
+      assert.match(client.getInstructions() ?? "", /prepare_review_mode/);
+      assert.match(client.getInstructions() ?? "", /Tell the user the returned triggerPrefix/);
       assert.match(client.getInstructions() ?? "", /host\/session-name/);
 
       const tools = await client.listTools();
       assert.ok(tools.tools.some((tool) => tool.name === "ask_review_peer"));
+      assert.ok(tools.tools.some((tool) => tool.name === "prepare_review_mode"));
       assert.ok(tools.tools.some((tool) => tool.name === "send_message"));
       assert.ok(tools.tools.some((tool) => tool.name === "wait_for_message"));
       assert.ok(tools.tools.some((tool) => tool.name === "wait_for_review_request"));
@@ -124,10 +128,17 @@ describe("walkie-tokie-mcp", () => {
         answer: "Yes, the copy-paste trigger routes to send_message.",
       });
 
+      const prepared = await callJson(client, "prepare_review_mode", {
+        session_name: "prepared-review",
+        capabilities: ["inspect", "explain"],
+      });
+      assert.equal(prepared.status, "created");
+      assert.equal(prepared.recipient, "alice-laptop/prepared-review");
+      assert.equal(prepared.triggerPrefix, "walkie-tokie/alice-laptop/prepared-review");
+      assert.match(prepared.message, /Share this/);
+
       const autoWait = callJson(client, "wait_for_message", {
         session_name: "auto-start-review",
-        repo: "example/repo",
-        pr: 5678,
         capabilities: ["inspect"],
         timeoutSeconds: 5,
       });

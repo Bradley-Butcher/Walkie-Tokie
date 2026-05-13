@@ -41,8 +41,8 @@ export class RelayError extends Error {
 
 export interface ReviewEndpoint {
   target: string;
-  repo: string;
-  pr: number;
+  repo?: string;
+  pr?: number;
   session: string;
   state: ReviewState;
   capabilities: Capability[];

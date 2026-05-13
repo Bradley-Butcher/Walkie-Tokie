@@ -10,6 +10,7 @@ import {
   capabilitySchema,
   hostSchema,
   questionSchema,
+  prepareReviewModeMcpSchema,
   recipientSchema,
   repoSchema,
   requestIdSchema,
@@ -24,17 +25,18 @@ const client = new RelayHttpClient();
 
 const server = new McpServer({
   name: "walkie-tokie",
-  version: "0.1.0",
+  version: "0.1.2",
 }, {
   instructions: `Use Walkie Tokie to let Codex agents on the same Tailscale network ask each other PR-review questions.
 
 Install it once on every machine. The same tools support both roles.
 
 Preferred author flow:
-1. Call wait_for_message with a human session name, repo, pr, and capabilities.
-2. wait_for_message starts the local daemon if needed, creates review mode if needed, then blocks.
-3. When a message arrives, answer it and call reply_to_review_request with the requestId.
-4. Call wait_for_message again to keep accepting review questions.
+1. Call prepare_review_mode with a human session name and capabilities. Include repo and pr when this is PR-related.
+2. Tell the user the returned triggerPrefix and recipient before blocking; this is the string they should share.
+3. Call wait_for_message with the same session name and capabilities.
+4. When a message arrives, answer it and call reply_to_review_request with the requestId.
+5. Call wait_for_message again to keep accepting review questions.
 
 Preferred reviewer flow:
 1. Ask the author for their recipient identifier, shaped like host/session-name, for example alice-laptop/review-pr-123.
@@ -82,9 +84,9 @@ server.registerTool(
     title: "Start Review Mode",
     description: "Create or replace a review endpoint for an author's parked Codex session.",
     inputSchema: {
-      target: targetSchema.describe("Endpoint id, such as team/example/repo#1234"),
-      repo: repoSchema.describe("Repository in owner/name form"),
-      pr: z.number().int().positive().describe("Pull request number"),
+      target: targetSchema.describe("Endpoint id, such as team/example/repo#1234 or session/design-thread"),
+      repo: repoSchema.optional().describe("Optional repository in owner/name form"),
+      pr: z.number().int().positive().optional().describe("Optional pull request number"),
       session: sessionSchema.describe("Human-friendly Codex session name or id"),
       capabilities: z.array(capabilitySchema).min(1).describe("Capabilities reviewers may request"),
       maxPending: z.number().int().positive().max(100).optional().describe("Maximum queued questions"),
@@ -129,6 +131,35 @@ server.registerTool(
 );
 
 server.registerTool(
+  "prepare_review_mode",
+  {
+    title: "Prepare Review Mode",
+    description:
+      "Author-side setup. Starts the local relay, creates review mode if needed, and returns the recipient string to share before waiting.",
+    inputSchema: {
+      session_name: sessionSchema.describe("Author's review session name, such as review-pr-123"),
+      repo: repoSchema.optional().describe("Optional repository in owner/name form."),
+      pr: z.number().int().positive().optional().describe("Optional pull request number."),
+      capabilities: z.array(capabilitySchema).min(1).default(["inspect"]),
+      target: targetSchema
+        .optional()
+        .describe("Optional endpoint id. Defaults to local/repo#pr for PR context, otherwise session/session-name."),
+      maxPending: z.number().int().positive().max(100).optional(),
+    },
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+    },
+  },
+  async (input) => {
+    const parsed = prepareReviewModeMcpSchema.parse(input);
+    const relay = await ensureLocalRelay();
+    const reviewMode = await ensureReviewMode(parsed);
+    return jsonResult(reviewModeShare(parsed.session_name, relay, reviewMode.created));
+  },
+);
+
+server.registerTool(
   "wait_for_message",
   {
     title: "Wait For Message",
@@ -136,12 +167,12 @@ server.registerTool(
       "Author-side blocking wait for the next message addressed to a named review session. Starts the local relay and review mode if needed.",
     inputSchema: {
       session_name: sessionSchema.describe("Author's review session name, such as review-pr-123"),
-      repo: repoSchema.optional().describe("Repository in owner/name form. Required when creating review mode."),
-      pr: z.number().int().positive().optional().describe("Pull request number. Required when creating review mode."),
+      repo: repoSchema.optional().describe("Optional repository in owner/name form."),
+      pr: z.number().int().positive().optional().describe("Optional pull request number."),
       capabilities: z.array(capabilitySchema).min(1).default(["inspect"]),
       target: targetSchema
         .optional()
-        .describe("Optional endpoint id. Defaults to local/repo#pr when repo and pr are supplied."),
+        .describe("Optional endpoint id. Defaults to local/repo#pr for PR context, otherwise session/session-name."),
       maxPending: z.number().int().positive().max(100).optional(),
       timeoutSeconds: timeoutSecondsSchema(43_200, 86_400),
     },
@@ -247,6 +278,36 @@ async function ensureLocalRelay() {
   return await ensureDaemonRunning({ localUrl: client.baseUrl });
 }
 
+function reviewModeShare(
+  sessionName: string,
+  relay: Awaited<ReturnType<typeof ensureLocalRelay>>,
+  created: boolean,
+) {
+  const host = process.env.WALKIE_TOKIE_PUBLIC_HOST ?? relay.publicHost;
+  if (!host) {
+    return {
+      status: created ? "created" : "ready",
+      sessionName,
+      recipient: null,
+      triggerPrefix: null,
+      relay,
+      message:
+        "Review mode is ready, but Walkie Tokie could not detect a Tailscale host/IP to share. " +
+        "Set WALKIE_TOKIE_PUBLIC_HOST to your Tailscale hostname or IPv4 address, then call prepare_review_mode again.",
+    };
+  }
+
+  const recipient = `${host}/${sessionName}`;
+  return {
+    status: created ? "created" : "ready",
+    sessionName,
+    recipient,
+    triggerPrefix: `walkie-tokie/${recipient}`,
+    relay,
+    message: `Share this before waiting: walkie-tokie/${recipient} <question>`,
+  };
+}
+
 function resolveDestination(input: {
   to?: string;
   host?: string;
@@ -308,27 +369,21 @@ async function ensureReviewMode(input: {
   capabilities: string[];
   target?: string;
   maxPending?: number;
-}): Promise<void> {
+}): Promise<{ created: boolean }> {
   const existing = await client.get("/v1/review-endpoints");
   if (hasSession(existing, input.session_name)) {
-    return;
-  }
-
-  if (!input.repo || !input.pr) {
-    throw new Error(
-      "Review mode is not active for this session. Provide repo and pr " +
-        "the first time you call wait_for_message.",
-    );
+    return { created: false };
   }
 
   await client.post("/v1/review-mode/start", {
-    target: input.target ?? defaultTarget(input.repo, input.pr),
+    target: input.target ?? defaultTarget(input.session_name, input.repo, input.pr),
     repo: input.repo,
     pr: input.pr,
     session: input.session_name,
     capabilities: input.capabilities,
     maxPending: input.maxPending,
   });
+  return { created: true };
 }
 
 function hasSession(value: unknown, session: string): boolean {
@@ -344,8 +399,16 @@ function hasSession(value: unknown, session: string): boolean {
     });
 }
 
-function defaultTarget(repo: string, pr: number): string {
-  return `local/${repo}#${pr}`;
+function defaultTarget(sessionName: string, repo?: string, pr?: number): string {
+  if (repo && pr) {
+    return `local/${repo}#${pr}`;
+  }
+  return `session/${slugifySession(sessionName)}`;
+}
+
+function slugifySession(sessionName: string): string {
+  const slug = sessionName.replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "default";
 }
 
 function jsonResult(value: unknown) {
