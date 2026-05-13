@@ -7,8 +7,8 @@ export const targetSchema = z
   .string()
   .min(3)
   .max(300)
-  .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+#\d+$/, {
-    message: "target must look like namespace/owner/repo#123",
+  .regex(/^(?:[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+#\d+|session\/[a-zA-Z0-9_.-]+)$/, {
+    message: "target must look like namespace/owner/repo#123 or session/name",
   });
 
 export const repoSchema = z
@@ -52,8 +52,8 @@ export const originSchema = z
 export const startReviewModeSchema = z
   .object({
     target: targetSchema,
-    repo: repoSchema,
-    pr: z.number().int().positive(),
+    repo: repoSchema.optional(),
+    pr: z.number().int().positive().optional(),
     session: sessionSchema,
     capabilities: z.array(capabilitySchema).min(1).max(5),
     maxPending: z.number().int().positive().max(100).optional(),
@@ -68,6 +68,10 @@ export const waitForMessageMcpSchema = z.object({
   target: targetSchema.optional(),
   timeoutSeconds: timeoutSecondsSchema(43_200, 86_400),
   maxPending: z.number().int().positive().max(100).optional(),
+});
+
+export const prepareReviewModeMcpSchema = waitForMessageMcpSchema.omit({
+  timeoutSeconds: true,
 });
 
 export const closeReviewModeSchema = z

@@ -57,8 +57,8 @@ export class ReviewRelay {
 
   startReviewMode(input: {
     target: string;
-    repo: string;
-    pr: number;
+    repo?: string;
+    pr?: number;
     session: string;
     capabilities: Capability[];
     maxPending?: number;

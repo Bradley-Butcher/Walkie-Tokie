@@ -81,6 +81,45 @@ describe("ReviewRelay", () => {
     assert.equal((await ask).answer, "Yes, the session name resolves to the active review endpoint.");
   });
 
+  it("can expose a generic session without PR metadata", async () => {
+    const reviewRelay = new ReviewRelay({
+      makeRequestId: () => "req_generic",
+    });
+    const endpoint = reviewRelay.startReviewMode({
+      target: "session/design-thread",
+      session: "design-thread",
+      capabilities: ["inspect"],
+    });
+
+    assert.equal(endpoint.repo, undefined);
+    assert.equal(endpoint.pr, undefined);
+
+    const wait = reviewRelay.waitForReviewSession({
+      session: "design-thread",
+      timeoutSeconds: 30,
+    });
+    const ask = reviewRelay.askReviewSession({
+      session: "design-thread",
+      question: "What did we decide?",
+      mode: "inspect",
+      timeoutSeconds: 30,
+    });
+
+    const delivered = await wait;
+    assert.equal(delivered.request?.target, "session/design-thread");
+    assert.equal(delivered.request?.question, "What did we decide?");
+
+    reviewRelay.replyToReviewRequest({
+      requestId: "req_generic",
+      answer: "We decided to keep the session as the durable context boundary.",
+    });
+
+    assert.equal(
+      (await ask).answer,
+      "We decided to keep the session as the durable context boundary.",
+    );
+  });
+
   it("queues asks while the author is answering and keeps reviewer calls blocked", async () => {
     const reviewRelay = relay();
 

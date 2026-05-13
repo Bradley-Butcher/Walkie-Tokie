@@ -218,4 +218,26 @@ describe("relay HTTP server", () => {
       await app.close();
     }
   });
+
+  it("starts a generic session endpoint without PR metadata", async () => {
+    const { app } = createRelayHttpServer();
+    try {
+      const start = await app.inject({
+        method: "POST",
+        url: "/v1/review-mode/start",
+        payload: {
+          target: "session/design-thread",
+          session: "design-thread",
+          capabilities: ["inspect"],
+        },
+      });
+
+      assert.equal(start.statusCode, 200);
+      assert.equal(start.json().endpoint.target, "session/design-thread");
+      assert.equal(start.json().endpoint.repo, undefined);
+      assert.equal(start.json().endpoint.pr, undefined);
+    } finally {
+      await app.close();
+    }
+  });
 });
