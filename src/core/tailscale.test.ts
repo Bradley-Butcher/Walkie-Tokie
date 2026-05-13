@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import type { NetworkInterfaceInfo } from "node:os";
 import { describe, it } from "node:test";
 import {
+  detectTailscaleHost,
+  detectTailscaleHostnameFromCli,
   detectTailscaleIpv4,
   detectTailscaleIpv4FromCli,
   detectTailscaleIpv4FromInterfaces,
@@ -38,6 +40,63 @@ describe("Tailscale address detection", () => {
     }));
 
     assert.equal(address, "100.78.16.74");
+  });
+
+  it("prefers the Tailscale DNS hostname over the raw IPv4 address", () => {
+    const host = detectTailscaleHost({
+      runCommand: (command, args) => {
+        if (args.join(" ") === "status --json") {
+          return {
+            status: 0,
+            stdout: JSON.stringify({
+              Self: {
+                DNSName: "brad-laptop.example.ts.net.",
+                HostName: "MacBook-Pro",
+              },
+            }),
+          };
+        }
+        return {
+          status: 0,
+          stdout: "100.78.16.74\n",
+        };
+      },
+    });
+
+    assert.equal(host, "brad-laptop");
+  });
+
+  it("tries the macOS app-bundled Tailscale CLI when tailscale is not on PATH", () => {
+    const commands: string[] = [];
+    const host = detectTailscaleHostnameFromCli((command) => {
+      commands.push(command);
+      return {
+        status: command.includes("Tailscale.app") ? 0 : 1,
+        stdout: command.includes("Tailscale.app")
+          ? JSON.stringify({ Self: { DNSName: "brad-laptop.example.ts.net." } })
+          : "",
+      };
+    });
+
+    assert.deepEqual(commands, [
+      "tailscale",
+      "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+    ]);
+    assert.equal(host, "brad-laptop");
+  });
+
+  it("falls back to Tailscale IPv4 when hostname discovery is unavailable", () => {
+    const host = detectTailscaleHost({
+      runCommand: () => ({
+        status: 1,
+        stdout: "",
+      }),
+      interfaces: {
+        utun8: [ipv4("100.78.16.74", false)],
+      },
+    });
+
+    assert.equal(host, "100.78.16.74");
   });
 
   it("ignores non-Tailscale CLI output", () => {

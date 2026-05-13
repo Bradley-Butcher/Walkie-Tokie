@@ -25,7 +25,7 @@ const client = new RelayHttpClient();
 
 const server = new McpServer({
   name: "walkie-tokie",
-  version: "0.1.3",
+  version: "0.1.4",
 }, {
   instructions: `Use Walkie Tokie to let Codex agents on the same Tailscale network ask each other PR-review questions.
 
@@ -36,7 +36,7 @@ Preferred author flow:
 2. Tell the user the returned triggerPrefix and recipient before blocking; this is the string they should share.
 3. Call wait_for_message with the same session name and capabilities.
 4. When a message arrives, answer it and call reply_to_review_request with the requestId.
-5. Call wait_for_message again to keep accepting review questions.
+5. Immediately call wait_for_message again after every reply, unless the user told you to stop or close review mode. Reviewer agents may have follow-up questions.
 
 Preferred reviewer flow:
 1. Ask the author for their recipient identifier, shaped like host/session-name, for example alice-laptop/review-pr-123.

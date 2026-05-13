@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name("walkie-tokie")
   .description("CLI for Walkie Tokie agent review messages")
-  .version("0.1.3");
+  .version("0.1.4");
 
 const mcp = program.command("mcp").description("Manage the Codex MCP integration");
 

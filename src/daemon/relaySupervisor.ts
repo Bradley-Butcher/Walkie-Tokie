@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { detectTailscaleIpv4 } from "../core/tailscale.js";
+import { detectTailscaleHost } from "../core/tailscale.js";
 
 export interface RelaySupervisorOptions {
   localUrl?: string;
@@ -37,7 +37,7 @@ export async function ensureDaemonRunning(
   const port = options.port ?? defaultPort;
   const localUrl = options.localUrl ?? `http://127.0.0.1:${port}`;
   const fetchImpl = options.fetch ?? fetch;
-  const publicHost = (options.detectTailscaleIp ?? detectTailscaleIpv4)();
+  const publicHost = (options.detectTailscaleIp ?? detectTailscaleHost)();
 
   if (await isHealthy(localUrl, fetchImpl)) {
     return relayStatusResult({ running: true, localUrl, publicHost, port });
@@ -70,7 +70,7 @@ export async function relayStatus(options: RelaySupervisorOptions = {}): Promise
   const localUrl = options.localUrl ?? `http://127.0.0.1:${port}`;
   const fetchImpl = options.fetch ?? fetch;
   const running = await isHealthy(localUrl, fetchImpl);
-  const publicHost = (options.detectTailscaleIp ?? detectTailscaleIpv4)();
+  const publicHost = (options.detectTailscaleIp ?? detectTailscaleHost)();
   return relayStatusResult({ running, localUrl, publicHost, port });
 }
 

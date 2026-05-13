@@ -33,6 +33,8 @@ describe("walkie-tokie-mcp", () => {
       assert.match(client.getInstructions() ?? "", /Preferred reviewer flow/);
       assert.match(client.getInstructions() ?? "", /prepare_review_mode/);
       assert.match(client.getInstructions() ?? "", /Tell the user the returned triggerPrefix/);
+      assert.match(client.getInstructions() ?? "", /Immediately call wait_for_message again after every reply/);
+      assert.match(client.getInstructions() ?? "", /follow-up questions/);
       assert.match(client.getInstructions() ?? "", /host\/session-name/);
 
       const tools = await client.listTools();
