@@ -33,9 +33,9 @@
     "test": "node --test dist/**/*.test.js"
   },
   "bin": {
-    "walkie-tokie": "./dist/bin/walkie-tokie.js",
-    "walkie-tokie-mcp": "./dist/bin/walkie-tokie-mcp.js",
-    "walkie-tokied": "./dist/bin/walkie-tokied.js"
+    "walkie-tokie": "dist/bin/walkie-tokie.js",
+    "walkie-tokie-mcp": "dist/bin/walkie-tokie-mcp.js",
+    "walkie-tokied": "dist/bin/walkie-tokied.js"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
