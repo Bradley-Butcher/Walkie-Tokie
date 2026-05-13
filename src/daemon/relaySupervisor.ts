@@ -37,12 +37,11 @@ export async function ensureDaemonRunning(
   const port = options.port ?? defaultPort;
   const localUrl = options.localUrl ?? `http://127.0.0.1:${port}`;
   const fetchImpl = options.fetch ?? fetch;
+  const publicHost = (options.detectTailscaleIp ?? detectTailscaleIpv4)();
 
   if (await isHealthy(localUrl, fetchImpl)) {
-    return { running: true, localUrl };
+    return relayStatusResult({ running: true, localUrl, publicHost, port });
   }
-
-  const publicHost = (options.detectTailscaleIp ?? detectTailscaleIpv4)();
 
   const child = startDaemon({
     host: defaultBindHost,
@@ -72,11 +71,20 @@ export async function relayStatus(options: RelaySupervisorOptions = {}): Promise
   const fetchImpl = options.fetch ?? fetch;
   const running = await isHealthy(localUrl, fetchImpl);
   const publicHost = (options.detectTailscaleIp ?? detectTailscaleIpv4)();
+  return relayStatusResult({ running, localUrl, publicHost, port });
+}
+
+function relayStatusResult(input: {
+  running: boolean;
+  localUrl: string;
+  publicHost?: string;
+  port: number;
+}): RelayStatus {
   return {
-    running,
-    localUrl,
-    publicHost,
-    publicUrl: publicHost ? `http://${publicHost}:${port}` : undefined,
+    running: input.running,
+    localUrl: input.localUrl,
+    publicHost: input.publicHost,
+    publicUrl: input.publicHost ? `http://${input.publicHost}:${input.port}` : undefined,
   };
 }
 

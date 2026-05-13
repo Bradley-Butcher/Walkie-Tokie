@@ -3,9 +3,10 @@ import { describe, it } from "node:test";
 import { ensureDaemonRunning, relayStatus } from "./relaySupervisor.js";
 
 describe("relay supervisor", () => {
-  it("returns existing health without spawning the daemon", async () => {
+  it("returns existing health and public URL without spawning the daemon", async () => {
     let spawnCount = 0;
     const status = await ensureDaemonRunning({
+      detectTailscaleIp: () => "100.64.0.10",
       fetch: async () => new Response("ok", { status: 200 }),
       spawnProcess: () => {
         spawnCount += 1;
@@ -17,6 +18,8 @@ describe("relay supervisor", () => {
     assert.deepEqual(status, {
       running: true,
       localUrl: "http://127.0.0.1:8787",
+      publicHost: "100.64.0.10",
+      publicUrl: "http://100.64.0.10:8787",
     });
   });
 

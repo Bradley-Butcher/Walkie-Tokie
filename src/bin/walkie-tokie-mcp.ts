@@ -25,7 +25,7 @@ const client = new RelayHttpClient();
 
 const server = new McpServer({
   name: "walkie-tokie",
-  version: "0.1.2",
+  version: "0.1.3",
 }, {
   instructions: `Use Walkie Tokie to let Codex agents on the same Tailscale network ask each other PR-review questions.
 
