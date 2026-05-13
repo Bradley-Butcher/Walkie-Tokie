@@ -117,7 +117,7 @@ const reviewMode = program.command("review-mode").description("Manage review mod
 reviewMode
   .command("start")
   .description("Create or replace a review endpoint")
-  .requiredOption("--target <target>", "Endpoint id, such as brad/withcoral/coral#1234")
+  .requiredOption("--target <target>", "Endpoint id, such as team/example/repo#1234")
   .requiredOption("--repo <repo>", "Repository in owner/name form")
   .requiredOption("--pr <number>", "Pull request number", parsePositiveInt)
   .requiredOption("--session <id>", "Human-friendly Codex session id")
@@ -137,7 +137,7 @@ reviewMode
 reviewMode
   .command("close")
   .description("Close a review endpoint and cancel queued requests")
-  .requiredOption("--target <target>", "Endpoint id, such as brad/withcoral/coral#1234")
+  .requiredOption("--target <target>", "Endpoint id, such as team/example/repo#1234")
   .action(async (options) => {
     await post("/v1/review-mode/close", {
       target: options.target,

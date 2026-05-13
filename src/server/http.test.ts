@@ -12,7 +12,7 @@ describe("relay HTTP server", () => {
   });
 
   it("requires bearer auth when a relay token is configured", async () => {
-    const { app } = createRelayHttpServer({ token: "secret-token" });
+    const { app } = createRelayHttpServer({ token: "test-token" });
     try {
       const rejected = await app.inject({
         method: "GET",
@@ -25,7 +25,7 @@ describe("relay HTTP server", () => {
         method: "GET",
         url: "/v1/review-endpoints",
         headers: {
-          authorization: "Bearer secret-token",
+          authorization: "Bearer test-token",
         },
       });
       assert.equal(accepted.statusCode, 200);
@@ -42,10 +42,10 @@ describe("relay HTTP server", () => {
         method: "POST",
         url: "/v1/review-mode/start",
         payload: {
-          target: "withcoral/coral#1234",
-          repo: "withcoral/coral",
+          target: "example-repo#1234",
+          repo: "example/repo",
           pr: 1234,
-          session: "big-brain-bert",
+          session: "review-pr-123",
           capabilities: ["inspect"],
         },
       });
@@ -66,15 +66,15 @@ describe("relay HTTP server", () => {
   it("runs the blocking wait/ask/reply exchange through Fastify routes", async () => {
     const { app } = createRelayHttpServer();
     try {
-      const target = "brad/withcoral/coral#1234";
+      const target = "team/example/repo#1234";
       const start = await app.inject({
         method: "POST",
         url: "/v1/review-mode/start",
         payload: {
           target,
-          repo: "withcoral/coral",
+          repo: "example/repo",
           pr: 1234,
-          session: "big-brain-bert",
+          session: "review-pr-123",
           capabilities: ["inspect"],
         },
       });
@@ -128,22 +128,22 @@ describe("relay HTTP server", () => {
   it("routes messages by session name", async () => {
     const { app } = createRelayHttpServer();
     try {
-      const target = "brad/withcoral/coral#1234";
+      const target = "team/example/repo#1234";
       await app.inject({
         method: "POST",
         url: "/v1/review-mode/start",
         payload: {
           target,
-          repo: "withcoral/coral",
+          repo: "example/repo",
           pr: 1234,
-          session: "big-lad-john",
+          session: "review-pr-123",
           capabilities: ["inspect"],
         },
       });
 
       const wait = app.inject({
         method: "POST",
-        url: "/v1/sessions/big-lad-john/wait",
+        url: "/v1/sessions/review-pr-123/wait",
         payload: {
           timeoutSeconds: 5,
         },
@@ -151,7 +151,7 @@ describe("relay HTTP server", () => {
 
       const ask = app.inject({
         method: "POST",
-        url: "/v1/sessions/big-lad-john/messages/wait",
+        url: "/v1/sessions/review-pr-123/messages/wait",
         payload: {
           message: "Can I send by session name?",
           mode: "inspect",
