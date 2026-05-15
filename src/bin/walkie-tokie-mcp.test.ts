@@ -32,9 +32,12 @@ describe("walkie-tokie-mcp", () => {
       await client.connect(transport);
       assert.match(client.getInstructions() ?? "", /Preferred reviewer flow/);
       assert.match(client.getInstructions() ?? "", /prepare_review_mode/);
-      assert.match(client.getInstructions() ?? "", /Tell the user the returned triggerPrefix/);
+      assert.match(client.getInstructions() ?? "", /remoteTriggerPrefix/);
+      assert.match(client.getInstructions() ?? "", /localTriggerPrefix/);
       assert.match(client.getInstructions() ?? "", /Immediately call wait_for_message again after every reply/);
       assert.match(client.getInstructions() ?? "", /follow-up questions/);
+      assert.match(client.getInstructions() ?? "", /Use 60 second reviewer-side waits by default/);
+      assert.match(client.getInstructions() ?? "", /Do not call send_message again for the same question after a timeout/);
       assert.match(client.getInstructions() ?? "", /host\/session-name/);
 
       const tools = await client.listTools();
@@ -137,7 +140,12 @@ describe("walkie-tokie-mcp", () => {
       assert.equal(prepared.status, "created");
       assert.equal(prepared.recipient, "alice-laptop/prepared-review");
       assert.equal(prepared.triggerPrefix, "walkie-tokie/alice-laptop/prepared-review");
-      assert.match(prepared.message, /Share this/);
+      assert.equal(prepared.remoteRecipient, "alice-laptop/prepared-review");
+      assert.equal(prepared.remoteTriggerPrefix, "walkie-tokie/alice-laptop/prepared-review");
+      assert.match(String(prepared.localRecipient), /^127\.0\.0\.1:\d+\/prepared-review$/);
+      assert.match(String(prepared.localTriggerPrefix), /^walkie-tokie\/127\.0\.0\.1:\d+\/prepared-review$/);
+      assert.match(prepared.message, /Remote agent:/);
+      assert.match(prepared.message, /Same-machine agent:/);
 
       const autoWait = callJson(client, "wait_for_message", {
         session_name: "auto-start-review",

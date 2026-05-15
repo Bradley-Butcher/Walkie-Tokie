@@ -11,11 +11,17 @@ forcing the author to stay online as the human relay.
 1. Someone has useful context in an agent session: a PR, a design discussion,
    an incident investigation, or a half-finished debugging thread.
 2. They park that agent in sharing mode. The agent should first call
-   `prepare_review_mode`, then share the returned recipient string before it
-   starts waiting:
+   `prepare_review_mode`, then share the returned recipient strings before it
+   starts waiting. Agents on another machine use the remote form:
 
    ```text
    walkie-tokie/alice-laptop/review-pr-123
+   ```
+
+   Agents on the same machine use the local form:
+
+   ```text
+   walkie-tokie/127.0.0.1:8787/review-pr-123
    ```
 
 3. The parked agent then calls `wait_for_message` and blocks for reviewer
@@ -82,6 +88,11 @@ walkie-tokie/alice-laptop/review-pr-123 <question>
 
 When an MCP-enabled agent sees that shape, it should call `send_message` with
 the full string as `trigger`.
+
+Reviewer agents should use 60 second waits by default. Once the protocol grows
+resumable replies, reviewer agents should call `send_message` once, then keep
+calling `wait_for_reply` with the returned request id until the request is
+answered, rejected, cancelled, or the user asks them to stop.
 
 ## Development
 

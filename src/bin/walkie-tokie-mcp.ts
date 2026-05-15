@@ -25,7 +25,7 @@ const client = new RelayHttpClient();
 
 const server = new McpServer({
   name: "walkie-tokie",
-  version: "0.1.4",
+  version: "0.1.5",
 }, {
   instructions: `Use Walkie Tokie to let Codex agents on the same Tailscale network ask each other PR-review questions.
 
@@ -33,7 +33,7 @@ Install it once on every machine. The same tools support both roles.
 
 Preferred author flow:
 1. Call prepare_review_mode with a human session name and capabilities. Include repo and pr when this is PR-related.
-2. Tell the user the returned triggerPrefix and recipient before blocking; this is the string they should share.
+2. Tell the user both returned share strings before blocking: remoteTriggerPrefix for agents on another machine, and localTriggerPrefix for agents on the same machine.
 3. Call wait_for_message with the same session name and capabilities.
 4. When a message arrives, answer it and call reply_to_review_request with the requestId.
 5. Immediately call wait_for_message again after every reply, unless the user told you to stop or close review mode. Reviewer agents may have follow-up questions.
@@ -43,6 +43,7 @@ Preferred reviewer flow:
 2. If the user pastes a string shaped like "walkie-tokie/<host>/<session> <question>", call send_message with trigger=<that whole string>.
 3. Otherwise call send_message with to=<recipient identifier> and message=<question>.
 4. The call blocks until the author answers, rejects, closes review mode, or the timeout expires.
+5. Use 60 second reviewer-side waits by default. When resumable replies are available, call send_message once, then keep calling wait_for_reply with the returned requestId until it returns answered, rejected, cancelled, or the user tells you to stop. Do not call send_message again for the same question after a timeout.
 
 Use relay_status for debugging local relay reachability. Use start_review_mode, wait_for_review_request, and ask_review_peer only as lower-level/debug primitives. Do not ask users to manually start walkie-tokied in the normal flow.`,
 });
@@ -284,28 +285,52 @@ function reviewModeShare(
   created: boolean,
 ) {
   const host = process.env.WALKIE_TOKIE_PUBLIC_HOST ?? relay.publicHost;
+  const localRecipient = `${localHostPort(relay.localUrl)}/${sessionName}`;
+  const localTriggerPrefix = `walkie-tokie/${localRecipient}`;
   if (!host) {
     return {
       status: created ? "created" : "ready",
       sessionName,
       recipient: null,
       triggerPrefix: null,
+      remoteRecipient: null,
+      remoteTriggerPrefix: null,
+      localRecipient,
+      localTriggerPrefix,
       relay,
       message:
-        "Review mode is ready, but Walkie Tokie could not detect a Tailscale host/IP to share. " +
+        "Review mode is ready. For a same-machine agent, share: " +
+        `${localTriggerPrefix} <question>. Walkie Tokie could not detect a Tailscale host/IP for remote agents. ` +
         "Set WALKIE_TOKIE_PUBLIC_HOST to your Tailscale hostname or IPv4 address, then call prepare_review_mode again.",
     };
   }
 
-  const recipient = `${host}/${sessionName}`;
+  const remoteRecipient = `${host}/${sessionName}`;
+  const remoteTriggerPrefix = `walkie-tokie/${remoteRecipient}`;
   return {
     status: created ? "created" : "ready",
     sessionName,
-    recipient,
-    triggerPrefix: `walkie-tokie/${recipient}`,
+    recipient: remoteRecipient,
+    triggerPrefix: remoteTriggerPrefix,
+    remoteRecipient,
+    remoteTriggerPrefix,
+    localRecipient,
+    localTriggerPrefix,
     relay,
-    message: `Share this before waiting: walkie-tokie/${recipient} <question>`,
+    message:
+      `Remote agent: ${remoteTriggerPrefix} <question>. ` +
+      `Same-machine agent: ${localTriggerPrefix} <question>.`,
   };
+}
+
+function localHostPort(localUrl: string): string {
+  try {
+    const url = new URL(localUrl);
+    const port = url.port || "80";
+    return `${url.hostname}:${port}`;
+  } catch {
+    return "127.0.0.1:8787";
+  }
 }
 
 function resolveDestination(input: {
