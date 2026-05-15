@@ -8,8 +8,6 @@ import {
 } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { createRelayHttpServer, serverUrl } from "../server/http.js";
 
-const target = "team/example/repo#1234";
-
 describe("walkie-tokie-mcp", () => {
   it("exposes the blocking review exchange over stdio MCP", async () => {
     const { app } = createRelayHttpServer();
@@ -34,6 +32,7 @@ describe("walkie-tokie-mcp", () => {
       assert.match(client.getInstructions() ?? "", /prepare_review_mode/);
       assert.match(client.getInstructions() ?? "", /remoteTriggerPrefix/);
       assert.match(client.getInstructions() ?? "", /localTriggerPrefix/);
+      assert.match(client.getInstructions() ?? "", /Do not share only triggerPrefix/);
       assert.match(client.getInstructions() ?? "", /Immediately call wait_for_message again after every reply/);
       assert.match(client.getInstructions() ?? "", /follow-up questions/);
       assert.match(client.getInstructions() ?? "", /Use 60 second reviewer-side waits by default/);
@@ -41,45 +40,25 @@ describe("walkie-tokie-mcp", () => {
       assert.match(client.getInstructions() ?? "", /host\/session-name/);
 
       const tools = await client.listTools();
-      assert.ok(tools.tools.some((tool) => tool.name === "ask_review_peer"));
-      assert.ok(tools.tools.some((tool) => tool.name === "prepare_review_mode"));
-      assert.ok(tools.tools.some((tool) => tool.name === "send_message"));
-      assert.ok(tools.tools.some((tool) => tool.name === "wait_for_message"));
-      assert.ok(tools.tools.some((tool) => tool.name === "wait_for_review_request"));
+      assert.deepEqual(
+        tools.tools.map((tool) => tool.name).sort(),
+        [
+          "prepare_review_mode",
+          "relay_status",
+          "reply_to_review_request",
+          "send_message",
+          "wait_for_message",
+        ],
+      );
 
-      await callJson(client, "start_review_mode", {
-        target,
+      const preparedMain = await callJson(client, "prepare_review_mode", {
+        session_name: "review-pr-123",
         repo: "example/repo",
         pr: 1234,
-        session: "review-pr-123",
         capabilities: ["inspect"],
       });
-
-      const wait = callJson(client, "wait_for_review_request", {
-        endpoint: target,
-        timeoutSeconds: 5,
-      });
-      const ask = callJson(client, "ask_review_peer", {
-        target,
-        question: "Why is validation below the transport boundary?",
-        mode: "inspect",
-        timeoutSeconds: 5,
-      });
-
-      const delivered = await wait;
-      assert.equal(delivered.status, "request");
-      assert.equal(delivered.request.question, "Why is validation below the transport boundary?");
-
-      await callJson(client, "reply_to_review_request", {
-        requestId: delivered.request.requestId,
-        answer: "Because the transport boundary should stay thin.",
-      });
-
-      assert.deepEqual(await ask, {
-        requestId: delivered.request.requestId,
-        status: "answered",
-        answer: "Because the transport boundary should stay thin.",
-      });
+      assert.equal(preparedMain.remoteTriggerPrefix, "walkie-tokie/alice-laptop/review-pr-123");
+      assert.match(String(preparedMain.localTriggerPrefix), /^walkie-tokie\/127\.0\.0\.1:\d+\/review-pr-123$/);
 
       const address = app.server.address() as AddressInfo;
       const sessionWait = callJson(client, "wait_for_message", {
@@ -146,6 +125,8 @@ describe("walkie-tokie-mcp", () => {
       assert.match(String(prepared.localTriggerPrefix), /^walkie-tokie\/127\.0\.0\.1:\d+\/prepared-review$/);
       assert.match(prepared.message, /Remote agent:/);
       assert.match(prepared.message, /Same-machine agent:/);
+      assert.match(prepared.message, /walkie-tokie\/alice-laptop\/prepared-review <question>/);
+      assert.match(prepared.message, /walkie-tokie\/127\.0\.0\.1:\d+\/prepared-review <question>/);
 
       const autoWait = callJson(client, "wait_for_message", {
         session_name: "auto-start-review",
