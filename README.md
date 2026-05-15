@@ -68,7 +68,7 @@ questions.
 
 ## MCP Tools
 
-Most users should only need these tools:
+The MCP server exposes the happy-path tools only:
 
 - `prepare_review_mode`: starts the local relay, creates or refreshes a shared
   session, and returns remote and local share strings.
@@ -76,10 +76,6 @@ Most users should only need these tools:
 - `reply_to_review_request`: sends the answer back to the asking agent.
 - `send_message`: sends a question to a shared session and waits for the answer.
 - `relay_status`: reports local relay reachability.
-
-Lower-level tools are available for debugging and compatibility:
-`start_review_mode`, `list_review_endpoints`, `wait_for_review_request`, and
-`ask_review_peer`.
 
 ## Network Model
 

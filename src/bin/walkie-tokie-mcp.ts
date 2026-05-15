@@ -25,7 +25,7 @@ const client = new RelayHttpClient();
 
 const server = new McpServer({
   name: "walkie-tokie",
-  version: "0.1.5",
+  version: "0.1.6",
 }, {
   instructions: `Use Walkie Tokie to let Codex agents on the same Tailscale network ask each other PR-review questions.
 
@@ -33,7 +33,7 @@ Install it once on every machine. The same tools support both roles.
 
 Preferred author flow:
 1. Call prepare_review_mode with a human session name and capabilities. Include repo and pr when this is PR-related.
-2. Tell the user both returned share strings before blocking: remoteTriggerPrefix for agents on another machine, and localTriggerPrefix for agents on the same machine.
+2. Tell the user both returned share strings before blocking: remoteTriggerPrefix for agents on another machine, and localTriggerPrefix for agents on the same machine. Do not share only triggerPrefix; it is a compatibility alias.
 3. Call wait_for_message with the same session name and capabilities.
 4. When a message arrives, answer it and call reply_to_review_request with the requestId.
 5. Immediately call wait_for_message again after every reply, unless the user told you to stop or close review mode. Reviewer agents may have follow-up questions.
@@ -45,7 +45,7 @@ Preferred reviewer flow:
 4. The call blocks until the author answers, rejects, closes review mode, or the timeout expires.
 5. Use 60 second reviewer-side waits by default. When resumable replies are available, call send_message once, then keep calling wait_for_reply with the returned requestId until it returns answered, rejected, cancelled, or the user tells you to stop. Do not call send_message again for the same question after a timeout.
 
-Use relay_status for debugging local relay reachability. Use start_review_mode, wait_for_review_request, and ask_review_peer only as lower-level/debug primitives. Do not ask users to manually start walkie-tokied in the normal flow.`,
+Use relay_status for debugging local relay reachability. Do not ask users to manually start walkie-tokied in the normal flow.`,
 });
 
 server.registerTool(
@@ -63,80 +63,11 @@ server.registerTool(
 );
 
 server.registerTool(
-  "list_review_endpoints",
-  {
-    title: "List Review Endpoints",
-    description: "List review endpoints currently known to the local Walkie Tokie relay.",
-    inputSchema: {},
-    annotations: {
-      readOnlyHint: true,
-      openWorldHint: false,
-    },
-  },
-  async () => {
-    await ensureLocalRelay();
-    return jsonResult(await client.get("/v1/review-endpoints"));
-  },
-);
-
-server.registerTool(
-  "start_review_mode",
-  {
-    title: "Start Review Mode",
-    description: "Create or replace a review endpoint for an author's parked Codex session.",
-    inputSchema: {
-      target: targetSchema.describe("Endpoint id, such as team/example/repo#1234 or session/design-thread"),
-      repo: repoSchema.optional().describe("Optional repository in owner/name form"),
-      pr: z.number().int().positive().optional().describe("Optional pull request number"),
-      session: sessionSchema.describe("Human-friendly Codex session name or id"),
-      capabilities: z.array(capabilitySchema).min(1).describe("Capabilities reviewers may request"),
-      maxPending: z.number().int().positive().max(100).optional().describe("Maximum queued questions"),
-    },
-  },
-  async (input) => {
-    await ensureLocalRelay();
-    return jsonResult(await client.post("/v1/review-mode/start", input));
-  },
-);
-
-server.registerTool(
-  "close_review_mode",
-  {
-    title: "Close Review Mode",
-    description: "Close a review endpoint and cancel queued requests.",
-    inputSchema: {
-      target: targetSchema.describe("Endpoint id, such as team/example/repo#1234"),
-    },
-  },
-  async ({ target }) => {
-    await ensureLocalRelay();
-    return jsonResult(await client.post("/v1/review-mode/close", { target }));
-  },
-);
-
-server.registerTool(
-  "wait_for_review_request",
-  {
-    title: "Wait For Review Request",
-    description:
-      "Author-side blocking wait. Returns the next queued reviewer question or times out.",
-    inputSchema: {
-      endpoint: targetSchema.describe("Endpoint id to wait on"),
-      timeoutSeconds: timeoutSecondsSchema(43_200, 86_400),
-    },
-  },
-  async (input) => {
-    await ensureLocalRelay();
-    return jsonResult(await client.post("/v1/author/wait", input));
-  },
-);
-
-server.registerTool(
   "prepare_review_mode",
   {
     title: "Prepare Review Mode",
     description:
-      "Author-side setup. Starts the local relay, creates review mode if needed, and returns the recipient string to share before waiting.",
+      "Author-side setup. Starts the local relay, creates review mode if needed, and returns both remote and same-machine share strings to show before waiting.",
     inputSchema: {
       session_name: sessionSchema.describe("Author's review session name, such as review-pr-123"),
       repo: repoSchema.optional().describe("Optional repository in owner/name form."),
@@ -194,7 +125,7 @@ server.registerTool(
     title: "Reply To Review Request",
     description: "Author-side reply that completes a delivered review request.",
     inputSchema: {
-      requestId: requestIdSchema.describe("Request id returned by wait_for_review_request"),
+      requestId: requestIdSchema.describe("Request id returned by wait_for_message"),
       answer: answerSchema.describe("Answer to return to the reviewer"),
     },
   },
@@ -248,31 +179,6 @@ server.registerTool(
   },
 );
 
-server.registerTool(
-  "ask_review_peer",
-  {
-    title: "Ask Review Peer",
-    description:
-      "Reviewer-side blocking ask. Submits a question and waits for the author's agent to answer.",
-    inputSchema: {
-      target: targetSchema.describe("Endpoint id, such as team/example/repo#1234"),
-      question: questionSchema,
-      mode: capabilitySchema.default("inspect"),
-      timeoutSeconds: timeoutSecondsSchema(900, 3_600),
-    },
-  },
-  async (input) => {
-    return jsonResult(
-      await client.post("/v1/review-requests:wait", {
-        target: input.target,
-        question: input.question,
-        mode: input.mode,
-        timeoutSeconds: input.timeoutSeconds,
-      }),
-    );
-  },
-);
-
 await server.connect(new StdioServerTransport());
 
 async function ensureLocalRelay() {
@@ -318,8 +224,9 @@ function reviewModeShare(
     localTriggerPrefix,
     relay,
     message:
-      `Remote agent: ${remoteTriggerPrefix} <question>. ` +
-      `Same-machine agent: ${localTriggerPrefix} <question>.`,
+      "Walkie Tokie is ready. Share both strings before waiting:\n" +
+      `Remote agent: ${remoteTriggerPrefix} <question>\n` +
+      `Same-machine agent: ${localTriggerPrefix} <question>`,
   };
 }
 
