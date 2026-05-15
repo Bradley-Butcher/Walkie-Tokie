@@ -1,18 +1,23 @@
 #!/usr/bin/env node
+import { readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { Command, InvalidArgumentError } from "commander";
+import { setMcpServerToolTimeout } from "../core/codexConfig.js";
 import { capabilitySchema } from "../core/schemas.js";
 import { detectTailscaleIpv4 } from "../core/tailscale.js";
 import { RelayHttpClient } from "../client/relayHttpClient.js";
 
 const client = new RelayHttpClient();
 const program = new Command();
+const defaultCodexToolTimeoutSeconds = 86_400;
 
 program
   .name("walkie-tokie")
   .description("CLI for Walkie Tokie agent review messages")
-  .version("0.1.6");
+  .version("0.1.7");
 
 const mcp = program.command("mcp").description("Manage the Codex MCP integration");
 
@@ -21,6 +26,12 @@ mcp
   .description("Install the role-neutral Walkie Tokie MCP server into Codex")
   .option("--mcp-name <name>", "Codex MCP server name", "walkie-tokie")
   .option("--relay-url <url>", "Optional local relay URL for author-side tools", "http://127.0.0.1:8787")
+  .option(
+    "--tool-timeout <duration>",
+    "Codex MCP tool timeout, such as 1h or 24h",
+    parseDurationSeconds,
+    defaultCodexToolTimeoutSeconds,
+  )
   .option("--token <token>", "Optional bearer token for non-Tailscale deployments")
   .option("--skip-codex", "Only print commands; do not run codex mcp add")
   .action((options) => {
@@ -29,6 +40,7 @@ mcp
         name: options.mcpName,
         relayUrl: options.relayUrl,
         token: options.token,
+        toolTimeoutSeconds: options.toolTimeout,
       });
     }
 
@@ -36,6 +48,7 @@ mcp
       title: "Walkie Tokie MCP installed",
       lines: [
         `Local relay URL: ${options.relayUrl}`,
+        `Codex MCP tool timeout: ${formatDuration(options.toolTimeout)}`,
         "Reviewer use: send_message(to, message)",
         "Author use: call wait_for_message; it starts walkie-tokied when needed",
       ],
@@ -52,6 +65,12 @@ setup
   .option("--host <ip>", "Tailscale IPv4 address to bind the daemon to")
   .option("--port <number>", "Relay port", parsePositiveInt, 8787)
   .option("--mcp-name <name>", "Codex MCP server name", "walkie-tokie")
+  .option(
+    "--tool-timeout <duration>",
+    "Codex MCP tool timeout, such as 1h or 24h",
+    parseDurationSeconds,
+    defaultCodexToolTimeoutSeconds,
+  )
   .option("--token <token>", "Optional bearer token for non-Tailscale deployments")
   .option("--skip-codex", "Only print commands; do not run codex mcp add")
   .action((options) => {
@@ -70,6 +89,7 @@ setup
         name: options.mcpName,
         relayUrl: localRelayUrl,
         token: options.token,
+        toolTimeoutSeconds: options.toolTimeout,
       });
     }
 
@@ -83,6 +103,7 @@ setup
           },
           "walkie-tokied",
         )}`,
+        `Codex MCP tool timeout: ${formatDuration(options.toolTimeout)}`,
         `Give reviewers this URL: ${shareRelayUrl}`,
         "The daemon listens on all interfaces by default but rejects unauthenticated non-local, non-Tailscale peers.",
         options.token ? "Give reviewers the token too." : "No token needed for normal Tailscale use.",
@@ -94,6 +115,12 @@ setup
   .command("reviewer")
   .description("Compatibility alias for `walkie-tokie mcp install`")
   .option("--mcp-name <name>", "Codex MCP server name", "walkie-tokie")
+  .option(
+    "--tool-timeout <duration>",
+    "Codex MCP tool timeout, such as 1h or 24h",
+    parseDurationSeconds,
+    defaultCodexToolTimeoutSeconds,
+  )
   .option("--token <token>", "Optional bearer token if the author configured one")
   .option("--skip-codex", "Only print commands; do not run codex mcp add")
   .action((options) => {
@@ -102,12 +129,14 @@ setup
         name: options.mcpName,
         token: options.token,
         relayUrl: "http://127.0.0.1:8787",
+        toolTimeoutSeconds: options.toolTimeout,
       });
     }
 
     printSetupSummary({
       title: "Walkie Tokie MCP installed",
       lines: [
+        `Codex MCP tool timeout: ${formatDuration(options.toolTimeout)}`,
         "Your agent can now call send_message(to, message).",
       ],
     });
@@ -250,6 +279,7 @@ function configureCodexMcp(input: {
   name: string;
   relayUrl?: string;
   token?: string;
+  toolTimeoutSeconds: number;
 }): void {
   runCodex(["mcp", "remove", input.name], { allowFailure: true });
 
@@ -267,6 +297,14 @@ function configureCodexMcp(input: {
   args.push("--", process.execPath, siblingBin("walkie-tokie-mcp.js"));
 
   runCodex(args);
+  setCodexToolTimeout(input.name, input.toolTimeoutSeconds);
+}
+
+function setCodexToolTimeout(name: string, timeoutSeconds: number): void {
+  const configPath = join(process.env.CODEX_HOME ?? join(homedir(), ".codex"), "config.toml");
+  const currentConfig = readFileSync(configPath, "utf8");
+  const updatedConfig = setMcpServerToolTimeout(currentConfig, name, timeoutSeconds);
+  writeFileSync(configPath, updatedConfig);
 }
 
 function runCodex(args: string[], options: { allowFailure?: boolean } = {}): void {
@@ -306,4 +344,14 @@ function shellQuote(value: string): string {
     return value;
   }
   return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds % 3600 === 0) {
+    return `${seconds / 3600}h`;
+  }
+  if (seconds % 60 === 0) {
+    return `${seconds / 60}m`;
+  }
+  return `${seconds}s`;
 }

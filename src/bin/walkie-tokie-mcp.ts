@@ -25,7 +25,7 @@ const client = new RelayHttpClient();
 
 const server = new McpServer({
   name: "walkie-tokie",
-  version: "0.1.6",
+  version: "0.1.7",
 }, {
   instructions: `Use Walkie Tokie to let Codex agents on the same Tailscale network ask each other PR-review questions.
 
@@ -36,14 +36,13 @@ Preferred author flow:
 2. Tell the user both returned share strings before blocking: remoteTriggerPrefix for agents on another machine, and localTriggerPrefix for agents on the same machine. Do not share only triggerPrefix; it is a compatibility alias.
 3. Call wait_for_message with the same session name and capabilities.
 4. When a message arrives, answer it and call reply_to_review_request with the requestId.
-5. Immediately call wait_for_message again after every reply, unless the user told you to stop or close review mode. Reviewer agents may have follow-up questions.
+5. Immediately call wait_for_message again after every reply or timeout, unless the user told you to stop or close review mode. Reviewer agents may have follow-up questions.
 
 Preferred reviewer flow:
 1. Ask the author for their recipient identifier, shaped like host/session-name, for example alice-laptop/review-pr-123.
 2. If the user pastes a string shaped like "walkie-tokie/<host>/<session> <question>", call send_message with trigger=<that whole string>.
 3. Otherwise call send_message with to=<recipient identifier> and message=<question>.
 4. The call blocks until the author answers, rejects, closes review mode, or the timeout expires.
-5. Use 60 second reviewer-side waits by default. When resumable replies are available, call send_message once, then keep calling wait_for_reply with the returned requestId until it returns answered, rejected, cancelled, or the user tells you to stop. Do not call send_message again for the same question after a timeout.
 
 Use relay_status for debugging local relay reachability. Do not ask users to manually start walkie-tokied in the normal flow.`,
 });
@@ -106,7 +105,8 @@ server.registerTool(
         .optional()
         .describe("Optional endpoint id. Defaults to local/repo#pr for PR context, otherwise session/session-name."),
       maxPending: z.number().int().positive().max(100).optional(),
-      timeoutSeconds: timeoutSecondsSchema(43_200, 86_400),
+      timeoutSeconds: timeoutSecondsSchema(43_200, 86_400)
+        .describe("How long this MCP call waits for a message. Defaults to 12 hours."),
     },
   },
   async (input) => {
@@ -160,7 +160,8 @@ server.registerTool(
         .describe("Remote review session name, such as review-pr-123"),
       message: questionSchema.optional().describe("Message or question for the remote agent"),
       mode: capabilitySchema.default("inspect"),
-      timeoutSeconds: timeoutSecondsSchema(900, 3_600),
+      timeoutSeconds: timeoutSecondsSchema(900, 3_600)
+        .describe("How long this MCP call waits for an answer. Defaults to 15 minutes."),
       port: z.number().int().positive().max(65_535).default(8787),
     },
   },

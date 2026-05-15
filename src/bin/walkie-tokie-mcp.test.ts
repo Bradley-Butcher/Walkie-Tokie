@@ -33,10 +33,8 @@ describe("walkie-tokie-mcp", () => {
       assert.match(client.getInstructions() ?? "", /remoteTriggerPrefix/);
       assert.match(client.getInstructions() ?? "", /localTriggerPrefix/);
       assert.match(client.getInstructions() ?? "", /Do not share only triggerPrefix/);
-      assert.match(client.getInstructions() ?? "", /Immediately call wait_for_message again after every reply/);
+      assert.match(client.getInstructions() ?? "", /Immediately call wait_for_message again after every reply or timeout/);
       assert.match(client.getInstructions() ?? "", /follow-up questions/);
-      assert.match(client.getInstructions() ?? "", /Use 60 second reviewer-side waits by default/);
-      assert.match(client.getInstructions() ?? "", /Do not call send_message again for the same question after a timeout/);
       assert.match(client.getInstructions() ?? "", /host\/session-name/);
 
       const tools = await client.listTools();
@@ -50,6 +48,8 @@ describe("walkie-tokie-mcp", () => {
           "wait_for_message",
         ],
       );
+      assertToolTimeoutDefault(tools.tools, "wait_for_message", 43_200, 86_400);
+      assertToolTimeoutDefault(tools.tools, "send_message", 900, 3_600);
 
       const preparedMain = await callJson(client, "prepare_review_mode", {
         session_name: "review-pr-123",
@@ -181,4 +181,18 @@ async function callJson(
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function assertToolTimeoutDefault(
+  tools: Array<{ name: string; inputSchema?: unknown }>,
+  name: string,
+  fallback: number,
+  max: number,
+): void {
+  const tool = tools.find((candidate) => candidate.name === name);
+  assert.ok(tool, `expected ${name} tool`);
+  const schema = JSON.stringify(tool.inputSchema);
+  assert.match(schema, /"timeoutSeconds"/);
+  assert.match(schema, new RegExp(`"default":${fallback}`));
+  assert.match(schema, new RegExp(`"maximum":${max}`));
 }
