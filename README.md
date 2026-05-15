@@ -19,6 +19,10 @@ walkie-tokie mcp install
 
 Restart Codex after installing so it starts the MCP server.
 
+The installer also sets Codex's `tool_timeout_sec` for Walkie Tokie to 24h.
+That keeps long blocking waits under Walkie Tokie's control instead of being
+cut off by Codex's default MCP tool timeout.
+
 ## Quick Start
 
 ### Share A Session
@@ -56,11 +60,6 @@ walkie-tokie/alice-laptop/review-pr-123 Why does this validation live here?
 
 When an MCP-enabled agent sees that shape, it should call `send_message` with
 the full string as `trigger`.
-
-Reviewer agents should use 60 second waits by default. When resumable replies
-are available, reviewer agents should call `send_message` once, then keep
-calling `wait_for_reply` with the returned request id until the request is
-answered, rejected, cancelled, or the user asks them to stop.
 
 Author agents should call `wait_for_message` again after every reply unless the
 user tells them to stop or close review mode. Reviewer agents may have follow-up
